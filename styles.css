@@ -1,0 +1,78 @@
+:root {
+  --bg: #f4e6bf;
+  --ink: #2a2218;
+  --pink: #f27890;
+  --red: #e23d3d;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%;
+  background: #1c1814;
+  color: var(--ink);
+  font-family: "PingFang TC", "Noto Sans TC", ui-rounded, system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 12px 4px;
+  background: #2a2218;
+  color: #fff7e8;
+  flex: 0 0 auto;
+}
+.brand strong { font-size: 16px; margin-right: 8px; }
+.brand span { opacity: 0.7; font-size: 12px; }
+.status { font-size: 13px; font-variant-numeric: tabular-nums; }
+#game {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 0;
+  display: block;
+  background: #efe0a8;
+  touch-action: none;
+}
+.hud {
+  display: flex;
+  gap: 6px;
+  padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
+  background: #2a2218;
+  overflow-x: auto;
+  flex: 0 0 auto;
+}
+.hud button, .card button {
+  border: 2px solid #2a2218;
+  background: #fff4d6;
+  color: #2a2218;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.hud button:disabled { opacity: 0.4; }
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(40, 30, 20, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.overlay.hidden { display: none; }
+.card {
+  background: #fff6dc;
+  border: 3px solid #2a2218;
+  border-radius: 22px;
+  padding: 24px 22px;
+  max-width: 360px;
+  text-align: center;
+}
+.card h1 { margin: 0 0 8px; font-size: 28px; }
+.card .row { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+.fine { opacity: 0.6; font-size: 12px; }

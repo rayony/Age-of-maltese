@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#f7e9c8" />
+  <title>Age of Maltese 心心狗屋</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="top">
+      <div class="brand">
+        <strong>Age of Maltese</strong>
+        <span>心心狗屋</span>
+      </div>
+      <div id="status" class="status">蛋糕 0 · 人口 1/10 · 0:00</div>
+    </header>
+    <canvas id="game" width="1600" height="900"></canvas>
+    <div id="hud" class="hud">
+      <button data-act="worker">工狗 40</button>
+      <button data-act="playground">遊樂場 80</button>
+      <button data-act="fighter">鬥狗 55</button>
+      <button data-act="workshop">工坊 100</button>
+      <button data-act="car">狗車 70</button>
+      <button data-act="stop">停止</button>
+    </div>
+  </div>
+  <div id="title" class="overlay">
+    <div class="card">
+      <h1>Age of Maltese</h1>
+      <p>馬爾濟斯出工、穿戰衣、開紅敞篷。<br/>小金毛對家，騎米色電單車砸粉紅心。</p>
+      <div class="row">
+        <button id="easy">vs AI 簡單</button>
+        <button id="hard">vs AI 困難</button>
+      </div>
+      <p class="fine">人口 10 · 約 5 分鐘 · 拆狗屋獲勝</p>
+    </div>
+  </div>
+  <div id="end" class="overlay hidden">
+    <div class="card">
+      <h2 id="endTitle">勝利</h2>
+      <p id="endMsg"></p>
+      <button id="again">再來一局</button>
+    </div>
+  </div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
