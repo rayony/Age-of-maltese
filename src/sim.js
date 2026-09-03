@@ -109,6 +109,10 @@ export function issue(state, cmd) {
     promoteQueue(state, cmd.team);
     return;
   }
+  if (kind === "cutBuild") {
+    cutInBuild(state, cmd.team);
+    return;
+  }
   if (kind === "stop") {
     for (const u of unitsByIds(state, cmd.ids)) u.order = { type: "idle" };
     return;
@@ -201,6 +205,26 @@ export function activeBuild(state, team) {
   return unfinished(state, team).find((b) => b.phase === "building") || null;
 }
 
+export function nextQueued(state, team) {
+  return unfinished(state, team).find((b) => b.phase === "queued") || null;
+}
+
+function cutInBuild(state, team) {
+  const next = nextQueued(state, team);
+  if (!next) return;
+  const cur = activeBuild(state, team);
+  state.buildPaused[team] = false;
+  if (!cur || cur === next) {
+    next.phase = "building";
+    return;
+  }
+  const hold = cur.order;
+  cur.phase = "queued";
+  cur.order = next.order + 0.01;
+  next.order = hold;
+  next.phase = "building";
+}
+
 function promoteQueue(state, team) {
   if (state.buildPaused[team]) return;
   if (activeBuild(state, team)) return;
@@ -214,7 +238,8 @@ export function constructionHint(state, team) {
   const names = { playground: "遊樂場", workshop: "工坊" };
   if (state.buildPaused[team]) {
     const cur = list.find((b) => b.phase === "building") || list[0];
-    return `興建暫停 · ${names[cur.kind] || cur.kind}`;
+    const wait = list.filter((b) => b.phase === "queued").map((b) => names[b.kind] || b.kind);
+    return `全停 ${names[cur.kind] || cur.kind}${wait.length ? " · 排隊 " + wait.join("、") : ""}`;
   }
   const cur = activeBuild(state, team);
   const wait = list.filter((b) => b.phase === "queued").map((b) => names[b.kind] || b.kind);
