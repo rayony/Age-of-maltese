@@ -11,7 +11,8 @@ Inspired by the *feel* of line-drawn puppy games (including Maltese Snowwar), bu
 - vs AI (Easy / Hard); you play Mallow
 - Cake-only economy; home carts do not regen; mid cake shops do
 - Buildings place from the HUD and finish on a timer (Red Alert); workers only harvest
-- Click a constructing building (once) to rush it for half its cake cost
+- One building constructs at a time; extra buildings queue if you can pay now
+- Menu Pause / Resume the current construction; queued buildings start in order after resume + finish
 - Population cap 10 (workers + fighters + cars)
 - Instant death — retrain if a dog drops
 - Select a unit or building for a detail sidebar (HP digits, attack, status, actions)
