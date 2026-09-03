@@ -1,5 +1,5 @@
 import { TEAM, COSTS, MATCH_SECS, POP_CAP } from "./config.js";
-import { createState, step, issue, pickAt, teamPop, dist } from "./sim.js";
+import { createState, step, issue, pickAt, teamPop } from "./sim.js";
 import { tickAI } from "./ai.js";
 import { draw, viewFit, screenToWorld } from "./render.js";
 
@@ -61,20 +61,6 @@ function eventPos(e) {
   return screenToWorld(view, t.clientX - r.left, t.clientY - r.top);
 }
 
-function nearestUnfinished(p, team, maxD) {
-  let best = null;
-  let bd = maxD;
-  for (const b of state.buildings) {
-    if (b.team !== team || b.buildLeft <= 0 || b.hp <= 0) continue;
-    const d = dist(p, b);
-    if (d < bd) {
-      bd = d;
-      best = b;
-    }
-  }
-  return best;
-}
-
 function commandSelected(ids, hit, p) {
   if (!ids.length) return false;
   if (hit.kind === "cake") {
@@ -93,13 +79,12 @@ function commandSelected(ids, hit, p) {
     issue(state, { kind: "attack", ids, target: hit.id, tKind: "building" });
     return true;
   }
-  const site =
-    hit.kind === "building" && hit.team === TEAM.MALTESE
-      ? state.buildings.find((b) => b.id === hit.id && b.buildLeft > 0)
-      : nearestUnfinished(p, TEAM.MALTESE, 78);
-  if (site) {
-    issue(state, { kind: "buildSite", ids, bid: site.id });
-    return true;
+  if (hit.kind === "building" && hit.team === TEAM.MALTESE) {
+    const site = state.buildings.find((b) => b.id === hit.id && b.buildLeft > 0 && !b.rushed);
+    if (site) {
+      issue(state, { kind: "rushBuild", bid: site.id });
+      return true;
+    }
   }
   issue(state, { kind: "move", ids, x: p.x, y: p.y });
   return true;
