@@ -1,5 +1,5 @@
 import { TEAM, COSTS, MATCH_SECS, POP_CAP } from "./config.js";
-import { createState, step, issue, pickAt, teamPop, activeBuild, constructionHint } from "./sim.js";
+import { createState, step, issue, pickAt, teamPop, activeBuild, nextQueued, constructionHint } from "./sim.js";
 import { tickAI } from "./ai.js";
 import { draw, viewFit, screenToWorld } from "./render.js";
 
@@ -55,6 +55,7 @@ document.querySelectorAll(".hud [data-act]").forEach((btn) => {
       if (state.buildPaused[TEAM.MALTESE]) issue(state, { kind: "resumeBuild", team: TEAM.MALTESE });
       else issue(state, { kind: "pauseBuild", team: TEAM.MALTESE });
     }
+    if (act === "cutBuild") issue(state, { kind: "cutBuild", team: TEAM.MALTESE });
     if (act === "stop") issue(state, { kind: "stop", ids });
   });
 });
@@ -179,8 +180,10 @@ function hud() {
   const pauseBtn = document.querySelector('[data-act="pauseBuild"]');
   if (pauseBtn) {
     pauseBtn.disabled = !site;
-    pauseBtn.textContent = state.buildPaused[TEAM.MALTESE] ? "繼續興建" : "暫停興建";
+    pauseBtn.textContent = state.buildPaused[TEAM.MALTESE] ? "繼續興建" : "全停";
   }
+  const cutBtn = document.querySelector('[data-act="cutBuild"]');
+  if (cutBtn) cutBtn.disabled = !nextQueued(state, TEAM.MALTESE);
 }
 
 function setDis(act, on) {
