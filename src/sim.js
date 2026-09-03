@@ -98,15 +98,14 @@ export function issue(state, cmd) {
   if (kind === "trainWorker") return queueAt(state, cmd.team, "house", "worker");
   if (kind === "trainFighter") return queueAt(state, cmd.team, "playground", "fighter");
   if (kind === "trainCar") return queueAt(state, cmd.team, "workshop", "car");
-  if (kind === "build") return startBuild(state, cmd.team, cmd.what);
-  if (kind === "buildSite") {
-    const b = state.buildings.find((x) => x.id === cmd.bid && x.buildLeft > 0);
-    if (!b) return;
-    for (const u of unitsByIds(state, cmd.ids)) {
-      if (u.type !== "worker") continue;
-      u.order = { type: "build", bid: b.id };
-      u.piloting = false;
-    }
+  if (kind === "build") return startBuild(state, cmd.team, cmd.what, cmd.x, cmd.y);
+  if (kind === "rushBuild") {
+    const b = state.buildings.find((x) => x.id === cmd.bid && x.buildLeft > 0 && !x.rushed);
+    if (!b || b.kind === "house") return;
+    const fee = Math.ceil(COSTS[b.kind] * 0.5);
+    if (!spend(state, b.team, fee)) return;
+    b.buildLeft *= 0.5;
+    b.rushed = true;
     return;
   }
   if (kind === "stop") {
@@ -172,29 +171,20 @@ function queueAt(state, team, bKind, unitType) {
   b.queueT = TRAIN[unitType];
 }
 
-function startBuild(state, team, what) {
+function startBuild(state, team, what, x, y) {
   if (what !== "playground" && what !== "workshop") return;
   if (state.buildings.some((b) => b.team === team && b.kind === what)) return;
+  const fallback = slots(team)[what];
+  const pos = {
+    x: clamp(x ?? fallback.x, 80, W - 80),
+    y: clamp(y ?? fallback.y, 90, H - 90),
+  };
   if (!spend(state, team, COSTS[what])) return;
-  const pos = slots(team)[what];
-  const b = {
+  state.buildings.push({
     id: id(), kind: what, team, ...pos, r: 36,
     hp: 180, maxHp: 180, buildLeft: TRAIN[what],
-    queue: null, queueT: 0,
-  };
-  state.buildings.push(b);
-  const worker = nearestWorker(state, team, pos);
-  if (worker) worker.order = { type: "build", bid: b.id };
-}
-
-function nearestWorker(state, team, pos) {
-  let best = null, d = 1e9;
-  for (const u of state.units) {
-    if (u.team !== team || u.type !== "worker") continue;
-    const dd = dist(u, pos);
-    if (dd < d) { d = dd; best = u; }
-  }
-  return best;
+    queue: null, queueT: 0, rushed: false,
+  });
 }
 
 function fire(state, u, tx, ty, charge) {
@@ -273,8 +263,7 @@ export function step(state, dt) {
   for (const h of state.houses) tickQueue(state, h, dt);
   for (const b of state.buildings) {
     if (b.buildLeft > 0) {
-      const builder = state.units.find((u) => u.order.type === "build" && u.order.bid === b.id && dist(u, b) < 42);
-      if (builder) b.buildLeft -= dt;
+      b.buildLeft -= dt;
     } else {
       tickQueue(state, b, dt);
     }
@@ -331,9 +320,7 @@ function tickUnit(state, u, dt) {
   }
 
   if (o.type === "build") {
-    const b = state.buildings.find((x) => x.id === o.bid);
-    if (!b || b.buildLeft <= 0) { u.order = { type: "idle" }; return; }
-    moveToward(u, b, s.speed, dt);
+    u.order = { type: "idle" };
     return;
   }
 
@@ -407,11 +394,6 @@ function resolveHits(state) {
 
 export function pickAt(state, x, y, team) {
   const p = { x, y };
-  for (const b of state.buildings) {
-    if (b.buildLeft > 0 && dist(b, p) < b.r + 28) {
-      return { kind: "building", id: b.id, team: b.team };
-    }
-  }
   let best = null, bd = 28;
   for (const u of state.units) {
     if (team != null && u.team !== team) continue;
