@@ -99,6 +99,16 @@ export function issue(state, cmd) {
   if (kind === "trainFighter") return queueAt(state, cmd.team, "playground", "fighter");
   if (kind === "trainCar") return queueAt(state, cmd.team, "workshop", "car");
   if (kind === "build") return startBuild(state, cmd.team, cmd.what);
+  if (kind === "buildSite") {
+    const b = state.buildings.find((x) => x.id === cmd.bid && x.buildLeft > 0);
+    if (!b) return;
+    for (const u of unitsByIds(state, cmd.ids)) {
+      if (u.type !== "worker") continue;
+      u.order = { type: "build", bid: b.id };
+      u.piloting = false;
+    }
+    return;
+  }
   if (kind === "stop") {
     for (const u of unitsByIds(state, cmd.ids)) u.order = { type: "idle" };
     return;
@@ -396,21 +406,27 @@ function resolveHits(state) {
 }
 
 export function pickAt(state, x, y, team) {
+  const p = { x, y };
+  for (const b of state.buildings) {
+    if (b.buildLeft > 0 && dist(b, p) < b.r + 28) {
+      return { kind: "building", id: b.id, team: b.team };
+    }
+  }
   let best = null, bd = 28;
   for (const u of state.units) {
     if (team != null && u.team !== team) continue;
-    const d = dist(u, { x, y });
+    const d = dist(u, p);
     if (d < u.radius + 10 && d < bd) { bd = d; best = { kind: "unit", id: u.id, team: u.team }; }
   }
   if (best) return best;
   for (const n of state.cakes) {
-    if (dist(n, { x, y }) < 34) return { kind: "cake", id: n.id };
+    if (dist(n, p) < 34) return { kind: "cake", id: n.id };
   }
   for (const h of state.houses) {
-    if (dist(h, { x, y }) < h.r + 8) return { kind: "house", id: h.id, team: h.team };
+    if (dist(h, p) < h.r + 8) return { kind: "house", id: h.id, team: h.team };
   }
   for (const b of state.buildings) {
-    if (dist(b, { x, y }) < b.r + 8) return { kind: "building", id: b.id, team: b.team };
+    if (dist(b, p) < b.r + 8) return { kind: "building", id: b.id, team: b.team };
   }
   return { kind: "ground", x, y };
 }
