@@ -62,6 +62,7 @@ export function createState(difficulty = "easy") {
     units,
     hearts: [],
     fx: [],
+    buildPaused: [false, false],
   };
 }
 
@@ -99,13 +100,13 @@ export function issue(state, cmd) {
   if (kind === "trainFighter") return queueAt(state, cmd.team, "playground", "fighter");
   if (kind === "trainCar") return queueAt(state, cmd.team, "workshop", "car");
   if (kind === "build") return startBuild(state, cmd.team, cmd.what, cmd.x, cmd.y);
-  if (kind === "rushBuild") {
-    const b = state.buildings.find((x) => x.id === cmd.bid && x.buildLeft > 0 && !x.rushed);
-    if (!b || b.kind === "house") return;
-    const fee = Math.ceil(COSTS[b.kind] * 0.5);
-    if (!spend(state, b.team, fee)) return;
-    b.buildLeft *= 0.5;
-    b.rushed = true;
+  if (kind === "pauseBuild") {
+    if (activeBuild(state, cmd.team)) state.buildPaused[cmd.team] = true;
+    return;
+  }
+  if (kind === "resumeBuild") {
+    state.buildPaused[cmd.team] = false;
+    promoteQueue(state, cmd.team);
     return;
   }
   if (kind === "stop") {
@@ -180,11 +181,50 @@ function startBuild(state, team, what, x, y) {
     y: clamp(y ?? fallback.y, 90, H - 90),
   };
   if (!spend(state, team, COSTS[what])) return;
+  const busy = !!activeBuild(state, team);
   state.buildings.push({
     id: id(), kind: what, team, ...pos, r: 36,
     hp: 180, maxHp: 180, buildLeft: TRAIN[what],
-    queue: null, queueT: 0, rushed: false,
+    queue: null, queueT: 0,
+    phase: busy ? "queued" : "building",
+    order: id(),
   });
+}
+
+function unfinished(state, team) {
+  return state.buildings
+    .filter((b) => b.team === team && b.buildLeft > 0)
+    .sort((a, b) => a.order - b.order);
+}
+
+export function activeBuild(state, team) {
+  return unfinished(state, team).find((b) => b.phase === "building") || null;
+}
+
+function promoteQueue(state, team) {
+  if (state.buildPaused[team]) return;
+  if (activeBuild(state, team)) return;
+  const next = unfinished(state, team).find((b) => b.phase === "queued");
+  if (next) next.phase = "building";
+}
+
+export function constructionHint(state, team) {
+  const list = unfinished(state, team);
+  if (!list.length) return "";
+  const names = { playground: "遊樂場", workshop: "工坊" };
+  if (state.buildPaused[team]) {
+    const cur = list.find((b) => b.phase === "building") || list[0];
+    return `興建暫停 · ${names[cur.kind] || cur.kind}`;
+  }
+  const cur = activeBuild(state, team);
+  const wait = list.filter((b) => b.phase === "queued").map((b) => names[b.kind] || b.kind);
+  const parts = [];
+  if (cur) {
+    const pct = Math.max(0, Math.round((1 - cur.buildLeft / TRAIN[cur.kind]) * 100));
+    parts.push(`興建 ${names[cur.kind] || cur.kind} ${pct}%`);
+  }
+  if (wait.length) parts.push(`排隊 ${wait.join("、")}`);
+  return parts.join(" · ");
 }
 
 function fire(state, u, tx, ty, charge) {
@@ -261,12 +301,20 @@ export function step(state, dt) {
   }
 
   for (const h of state.houses) tickQueue(state, h, dt);
-  for (const b of state.buildings) {
-    if (b.buildLeft > 0) {
-      b.buildLeft -= dt;
-    } else {
-      tickQueue(state, b, dt);
+  for (const team of [TEAM.MALTESE, TEAM.RETRIEVER]) {
+    promoteQueue(state, team);
+    const cur = activeBuild(state, team);
+    if (cur && !state.buildPaused[team]) {
+      cur.buildLeft -= dt;
+      if (cur.buildLeft <= 0) {
+        cur.buildLeft = 0;
+        cur.phase = "done";
+        promoteQueue(state, team);
+      }
     }
+  }
+  for (const b of state.buildings) {
+    if (b.buildLeft <= 0) tickQueue(state, b, dt);
   }
 
   for (const u of state.units) tickUnit(state, u, dt);
