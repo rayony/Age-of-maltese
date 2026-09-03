@@ -1,4 +1,4 @@
-# Age of Maltese / 心心狗屋
+# Age of Maltese
 
 Five-minute cute RTS. Command the original **Mallow** pack (white, Maltese-type) against **Toast** (golden, retriever-type). Gather cake, train fighters, roll a red convertible, knock the other dog house to zero with pink hearts.
 
