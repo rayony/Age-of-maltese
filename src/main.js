@@ -1,5 +1,5 @@
 import { TEAM, COSTS, MATCH_SECS, POP_CAP } from "./config.js";
-import { createState, step, issue, pickAt, teamPop } from "./sim.js";
+import { createState, step, issue, pickAt, teamPop, activeBuild, constructionHint } from "./sim.js";
 import { tickAI } from "./ai.js";
 import { draw, viewFit, screenToWorld } from "./render.js";
 
@@ -51,6 +51,10 @@ document.querySelectorAll(".hud [data-act]").forEach((btn) => {
     if (act === "car") issue(state, { kind: "trainCar", team: TEAM.MALTESE });
     if (act === "playground") issue(state, { kind: "build", team: TEAM.MALTESE, what: "playground" });
     if (act === "workshop") issue(state, { kind: "build", team: TEAM.MALTESE, what: "workshop" });
+    if (act === "pauseBuild") {
+      if (state.buildPaused[TEAM.MALTESE]) issue(state, { kind: "resumeBuild", team: TEAM.MALTESE });
+      else issue(state, { kind: "pauseBuild", team: TEAM.MALTESE });
+    }
     if (act === "stop") issue(state, { kind: "stop", ids });
   });
 });
@@ -78,13 +82,6 @@ function commandSelected(ids, hit, p) {
   if (hit.kind === "building" && hit.team !== TEAM.MALTESE) {
     issue(state, { kind: "attack", ids, target: hit.id, tKind: "building" });
     return true;
-  }
-  if (hit.kind === "building" && hit.team === TEAM.MALTESE) {
-    const site = state.buildings.find((b) => b.id === hit.id && b.buildLeft > 0 && !b.rushed);
-    if (site) {
-      issue(state, { kind: "rushBuild", bid: site.id });
-      return true;
-    }
   }
   issue(state, { kind: "move", ids, x: p.x, y: p.y });
   return true;
@@ -169,7 +166,8 @@ function hud() {
   const mm = String(Math.floor(t / 60)).padStart(1, "0");
   const ss = String(t % 60).padStart(2, "0");
   const ot = state.t >= MATCH_SECS ? " · 加時掉血" : "";
-  statusEl.textContent = `蛋糕 ${cake} · 人口 ${pop}/${POP_CAP} · ${mm}:${ss}${ot}`;
+  const con = constructionHint(state, TEAM.MALTESE);
+  statusEl.textContent = `蛋糕 ${cake} · 人口 ${pop}/${POP_CAP} · ${mm}:${ss}${ot}${con ? " · " + con : ""}`;
   const play = state.buildings.some((b) => b.team === TEAM.MALTESE && b.kind === "playground" && b.buildLeft <= 0);
   const shop = state.buildings.some((b) => b.team === TEAM.MALTESE && b.kind === "workshop" && b.buildLeft <= 0);
   setDis("worker", cake < COSTS.worker || pop >= POP_CAP);
@@ -177,6 +175,12 @@ function hud() {
   setDis("fighter", cake < COSTS.fighter || !play || pop >= POP_CAP);
   setDis("workshop", cake < COSTS.workshop || state.buildings.some((b) => b.team === TEAM.MALTESE && b.kind === "workshop"));
   setDis("car", cake < COSTS.car || !shop || pop >= POP_CAP);
+  const site = activeBuild(state, TEAM.MALTESE) || state.buildings.find((b) => b.team === TEAM.MALTESE && b.buildLeft > 0);
+  const pauseBtn = document.querySelector('[data-act="pauseBuild"]');
+  if (pauseBtn) {
+    pauseBtn.disabled = !site;
+    pauseBtn.textContent = state.buildPaused[TEAM.MALTESE] ? "繼續興建" : "暫停興建";
+  }
 }
 
 function setDis(act, on) {
