@@ -5,6 +5,11 @@ export const MATCH_SECS = 300;
 
 export const TEAM = { MALTESE: 0, RETRIEVER: 1 };
 
+export const TEAM_NAME = {
+  0: "Mallow",
+  1: "Toast",
+};
+
 export const COSTS = {
   worker: 40,
   playground: 80,
@@ -22,13 +27,14 @@ export const TRAIN = {
 };
 
 export const STATS = {
-  worker: { hp: 46, speed: 95, range: 150, dmg: 8, rof: 1.15, radius: 16 },
+  worker: { hp: 46, speed: 95, range: 150, dmg: 8, charged: 8, rof: 1.15, radius: 16 },
   fighter: { hp: 88, speed: 82, range: 220, dmg: 14, charged: 22, rof: 1.35, radius: 18 },
-  car: { hp: 50, speed: 165, range: 175, dmg: 8, rof: 0.7, radius: 20 },
+  car: { hp: 50, speed: 165, range: 175, dmg: 8, charged: 8, rof: 0.7, radius: 20 },
 };
 
 export const HOUSE_HP = 400;
-export const HOUSE_DMG_OVERTIME = 8;
+export const FEVER_EVERY = 15;
+export const FEVER_DMG = 40;
 export const CARRY = 10;
 
 export const HOME_STOCK = 80;

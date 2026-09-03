@@ -1,23 +1,24 @@
 # Age of Maltese / 心心狗屋
 
-Five-minute cute RTS. Command a pack of **Maltese** against **golden retrievers** — gather cake, train fighters, roll a red convertible, and knock the other dog house to zero HP with pink hearts.
+Five-minute cute RTS. Command the original **Mallow** pack (white, Maltese-type) against **Toast** (golden, retriever-type). Gather cake, train fighters, roll a red convertible, knock the other dog house to zero with pink hearts.
 
-Fan follow-up to [Maltese Snowwar](https://github.com/rayony/maltese-snowwar). Unofficial, non-commercial.
+Inspired by the *feel* of line-drawn puppy games (including Maltese Snowwar), but every in-game character is an original drawing — not Super-Moco / 線條小狗 IP.
 
-**Play:** open `index.html` over HTTP (`npx serve .`) or enable GitHub Pages on this repo.
+**Play:** open `index.html` over HTTP (`npx serve .`) or GitHub Pages.
 
 ## Prototype
 
-- vs AI (Easy / Hard), you are always Maltese
-- Cake-only economy
-- Home picnic baskets **do not regen**; mid cake-wells **do**
-- Population cap **10** (workers + fighters + cars)
+- vs AI (Easy / Hard); you play Mallow
+- Cake-only economy; home baskets do not regen; mid wells do
+- Population cap 10 (workers + fighters + cars)
 - Instant death — retrain if a dog drops
-- AoE-style click commands
-- Long-press a selected fighter or car to pilot and throw a charged heart
-- Touch HUD for phones
+- Select a unit or building for a detail sidebar (HP digits, attack, status, actions)
+- Map shows HP **bars only**
+- After 5:00, **Fever**: both houses lose a fixed 40 HP every 15 seconds
+- Title + battle music, plus SFX (select / move / harvest / attack / fever / win / lose)
+- AoE click commands; hold a fighter or car to pilot a charged heart
 
-Not in this build: PvP rooms, bank notes / burgers, Cooking School techs, fog of war.
+Not in this build: PvP rooms, bank notes / burgers, Cooking School techs.
 
 ## Local
 
