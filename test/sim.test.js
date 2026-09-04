@@ -25,6 +25,8 @@ import {
   commandSelected,
   createState,
   hasReady,
+  inspectCopy,
+  isMarqueeSelect,
   issue,
   nextQueued,
   queuedCounts,
@@ -418,5 +420,14 @@ describe("config issues", () => {
     assert.ok(alignB > alignU);
     assert.equal(GOLD_COSTS.tower, 1);
     assert.equal(COSTS.tower, 0);
+  });
+});
+
+describe("click never select-all", () => {
+  it("tap-sized boxes are not marquee selects", () => {
+    assert.equal(isMarqueeSelect(0, 0, 20, 20), false);
+    assert.equal(isMarqueeSelect(0, 0, 36, 36), false);
+    assert.equal(isMarqueeSelect(0, 0, 80, 8), false);
+    assert.equal(isMarqueeSelect(0, 0, 90, 70), true);
   });
 });
