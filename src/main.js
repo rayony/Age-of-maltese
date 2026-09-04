@@ -71,6 +71,7 @@ const els = {
 
 let pickSide = TEAM.MALTESE;
 let lastCake = 0;
+let lastGold = 0;
 let state = createState("easy", true, pickSide);
 const sel = new Set();
 let inspect = null;
@@ -628,8 +629,20 @@ document.getElementById("clockBtn").onclick = () => {
 document.getElementById("cakeChip").onclick = () => {
   if (screen !== "play") return;
   const now = performance.now();
-  if (now - lastCake < 420) issue(state, { kind: "cheatCake", team: playerTeam(state) });
+  if (now - lastCake < 420) {
+    issue(state, { kind: "cheatCake", team: playerTeam(state) });
+    hud();
+  }
   lastCake = now;
+};
+document.getElementById("goldChip").onclick = () => {
+  if (screen !== "play") return;
+  const now = performance.now();
+  if (now - lastGold < 420) {
+    issue(state, { kind: "cheatGold", team: playerTeam(state) });
+    hud();
+  }
+  lastGold = now;
 };
 document.querySelectorAll("[data-side]").forEach((btn) => {
   btn.addEventListener("click", () => {

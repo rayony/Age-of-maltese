@@ -420,3 +420,32 @@ describe("config issues", () => {
     assert.equal(COSTS.tower, 0);
   });
 });
+
+describe("testing cheats", () => {
+  it("double-click cake command adds 100 cake", () => {
+    const state = createState("easy");
+    const before = state.cake[TEAM.MALTESE];
+    issue(state, { kind: "cheatCake", team: TEAM.MALTESE });
+    assert.equal(state.cake[TEAM.MALTESE], before + 100);
+    assert.ok(state.floaters.some((f) => f.text === "+100"));
+  });
+
+  it("double-click gold command adds 1 gold", () => {
+    const state = createState("easy");
+    assert.equal(state.gold[TEAM.MALTESE], 0);
+    issue(state, { kind: "cheatGold", team: TEAM.MALTESE });
+    assert.equal(state.gold[TEAM.MALTESE], 1);
+    issue(state, { kind: "cheatGold", team: TEAM.MALTESE });
+    assert.equal(state.gold[TEAM.MALTESE], 2);
+    assert.ok(state.floaters.some((f) => f.text === "+1幣"));
+  });
+
+  it("resource cheats do nothing on the title preview", () => {
+    const state = createState("easy", true);
+    const cake = state.cake[TEAM.MALTESE];
+    issue(state, { kind: "cheatCake", team: TEAM.MALTESE });
+    issue(state, { kind: "cheatGold", team: TEAM.MALTESE });
+    assert.equal(state.cake[TEAM.MALTESE], cake);
+    assert.equal(state.gold[TEAM.MALTESE], 0);
+  });
+});
