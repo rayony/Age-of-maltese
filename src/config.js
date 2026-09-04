@@ -66,8 +66,8 @@ export const HEART_R = 8;
 
 export const NAMES = {
   worker: { zh: "工狗", en: "Worker" },
-  fighter: { zh: "鬥狗", en: "Fighter" },
-  car: { zh: "狗車", en: "Car" },
+  fighter: { zh: "鬥士", en: "Fighter" },
+  car: { zh: "騎士", en: "Rider" },
   playground: { zh: "遊樂場", en: "Playground" },
   workshop: { zh: "工坊", en: "Workshop" },
   tower: { zh: "心心塔", en: "Heart tower" },

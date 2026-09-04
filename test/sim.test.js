@@ -209,3 +209,50 @@ describe("fever", () => {
     assert.ok(worker.x < x0 - 10);
   });
 });
+
+describe("bugfixes #5 #6 #14 #15", () => {
+  it("ignores enemy ids in commandSelected", () => {
+    const state = createState("easy");
+    const enemy = state.units.find((u) => u.team === TEAM.RETRIEVER);
+    const ox = enemy.x;
+    const ok = commandSelected(state, [enemy.id], { kind: "ground", x: 800, y: 450 }, { x: 800, y: 450 });
+    assert.equal(ok, false);
+    assert.equal(enemy.order.type, "idle");
+    assert.equal(enemy.x, ox);
+  });
+
+  it("only selected friendly units attack", () => {
+    const state = createState("easy");
+    const mine = state.units.find((u) => u.team === TEAM.MALTESE);
+    const other = { ...mine, id: 99, x: mine.x, y: mine.y + 40, order: { type: "idle" } };
+    state.units.push(other);
+    const foe = state.units.find((u) => u.team === TEAM.RETRIEVER);
+    commandSelected(state, [mine.id], { kind: "unit", id: foe.id, team: TEAM.RETRIEVER }, { x: foe.x, y: foe.y });
+    assert.equal(mine.order.type, "attack");
+    assert.equal(other.order.type, "idle");
+  });
+
+  it("freezes the clock after a winner", () => {
+    const state = createState("easy");
+    state.t = 12;
+    state.houses[0].hp = 0;
+    step(state, 1 / 30, 1 / 30);
+    assert.equal(state.winner, TEAM.RETRIEVER);
+    const t = state.t;
+    step(state, 1 / 30, 1 / 30);
+    step(state, 1, 1);
+    assert.equal(state.t, t);
+  });
+
+  it("fever double-KO is a player loss", () => {
+    const state = createState("easy");
+    state.t = MATCH_SECS + 0.01;
+    state.fever = true;
+    state.feverAcc = 15;
+    for (const h of state.houses) h.hp = FEVER_DMG;
+    step(state, 1 / 30, 1 / 30);
+    assert.equal(state.winner, TEAM.RETRIEVER);
+    assert.ok(state.events.includes("lose"));
+    assert.equal(state.events.includes("win"), false);
+  });
+});

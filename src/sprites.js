@@ -1,5 +1,5 @@
 const cache = new Map();
-const VER = "kawaii4";
+const VER = "kawaii11";
 
 const PATHS = [
   ...[0, 1, 2].flatMap((i) => [`sprites/maltese/worker-idle-${i}.png`, `sprites/retriever/worker-idle-${i}.png`]),
@@ -7,6 +7,7 @@ const PATHS = [
     [0, 1, 2, 3].flatMap((i) => [`sprites/maltese/worker-${a}-${i}.png`, `sprites/retriever/worker-${a}-${i}.png`]),
   ),
   ...[0, 1, 2, 3].flatMap((i) => [`sprites/maltese/fighter-${i}.png`, `sprites/retriever/fighter-${i}.png`]),
+  ...[0, 1, 2, 3].flatMap((i) => [`sprites/maltese/car-${i}.png`, `sprites/retriever/car-${i}.png`]),
   "sprites/maltese/car.png",
   "sprites/retriever/car.png",
   "sprites/buildings/house-maltese.png",
@@ -68,13 +69,18 @@ export function workerFrame(team, action, t) {
   return spr(`sprites/${teamFolder(team)}/worker-${action}-${i}.png`);
 }
 
-export function fighterFrame(team, t, moving) {
-  const i = moving ? animIndex(t, 4, 8) : animIndex(t, 4, 3);
+export function fighterFrame(team, t, moving, impact = false) {
+  const i = impact ? 2 : moving ? animIndex(t, 4, 8) : animIndex(t, 4, 3);
   return spr(`sprites/${teamFolder(team)}/fighter-${i}.png`);
 }
 
 export function carSpr(team) {
   return spr(`sprites/${teamFolder(team)}/car.png`);
+}
+
+export function carFrame(team, t, moving, impact = false) {
+  const i = impact ? 2 : moving ? animIndex(t, 4, 10) : animIndex(t, 4, 4);
+  return spr(`sprites/${teamFolder(team)}/car-${i}.png`) ?? carSpr(team);
 }
 
 export function houseSpr(team) {

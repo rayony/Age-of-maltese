@@ -189,6 +189,11 @@ function unitsByIds(state, ids) {
   const set = new Set(ids);
   return state.units.filter((u) => set.has(u.id));
 }
+function friendlyIds(state, ids, team = TEAM.MALTESE) {
+  if (!ids.length) return [];
+  const set = new Set(ids);
+  return state.units.filter((u) => set.has(u.id) && u.team === team).map((u) => u.id);
+}
 function buildingOf(state, team, kind) {
   if (kind === "house") return state.houses.find((h) => h.team === team);
   const ready = state.buildings.filter((b) => b.team === team && b.kind === kind && b.hp > 0 && b.buildLeft <= 0);
@@ -565,7 +570,7 @@ function tickUnit(state, u, dt) {
   if (o.type === "idle" && u.type !== "worker") {
     u.vx = 0;
     u.vy = 0;
-    const best = nearestEnemy(state, u, s.range, true);
+    const best = u.team === TEAM.MALTESE ? null : nearestEnemy(state, u, s.range, true);
     if (best && u.cd <= 0 && !state.preview) {
       const aim = aimAt(u, best.t);
       fire(state, u, aim.x, aim.y, 0, { id: best.t.id, kind: best.kind });
@@ -847,10 +852,15 @@ function step(state, dt, clockDt = dt) {
     }
   }
   if (!state.preview) {
-    for (const h of state.houses) {
-      if (h.hp <= 0) {
-        state.winner = h.team === TEAM.MALTESE ? TEAM.RETRIEVER : TEAM.MALTESE;
-        state.events.push(state.winner === TEAM.MALTESE ? "win" : "lose");
+    const malteseDead = state.houses.some((h) => h.team === TEAM.MALTESE && h.hp <= 0);
+    const retrieverDead = state.houses.some((h) => h.team === TEAM.RETRIEVER && h.hp <= 0);
+    if (malteseDead || retrieverDead) {
+      if (malteseDead) {
+        state.winner = TEAM.RETRIEVER;
+        state.events.push("lose");
+      } else {
+        state.winner = TEAM.MALTESE;
+        state.events.push("win");
       }
     }
   }
@@ -968,8 +978,8 @@ function inspectCopy(state, sel) {
     const trainP = !building && b.queue ? 1 - b.queueT / b.queueMax : null;
     const buildP = building ? 1 - b.buildLeft / b.buildMax : null;
     const actions = mine ? [
-      ...b.kind === "playground" && !building ? [{ id: "fighter", label: "\u8A13\u7DF4\u9B25\u72D7", enabled: state.cake[0] >= COSTS.fighter && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
-      ...b.kind === "workshop" && !building ? [{ id: "car", label: "\u8A13\u7DF4\u72D7\u8ECA", enabled: state.cake[0] >= COSTS.car && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
+      ...b.kind === "playground" && !building ? [{ id: "fighter", label: "訓練鬥士", enabled: state.cake[0] >= COSTS.fighter && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
+      ...b.kind === "workshop" && !building ? [{ id: "car", label: "訓練騎士", enabled: state.cake[0] >= COSTS.car && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
       { id: "rally", label: "\u8A2D\u96C6\u7D50\u9EDE", enabled: true }
     ] : [];
     return {
@@ -1014,37 +1024,39 @@ function coachHint(state) {
     return "\u9078\u5DE5\u72D7\uFF0C\u518D\u9EDE\u9910\u8ECA\u63A1\u96C6";
   }
   if (!play && cake >= COSTS.playground && state.t > 8) return "\u9EDE\u904A\u6A02\u5834\uFF0C\u518D\u9EDE\u5730\u5716\u653E\u4F4D\u7F6E";
-  if (play && fighters.length === 0 && cake >= COSTS.fighter) return "\u904A\u6A02\u5834\u5C31\u7DD2 \xB7 \u8A13\u7DF4\u9B25\u72D7\u51FA\u64CA";
+  if (play && fighters.length === 0 && cake >= COSTS.fighter) return "遊樂場就緒 · 訓練鬥士出擊";
   if (fighters.length >= 2 && fighters.every((f) => f.order.type === "idle") && state.t > 40) {
-    return "\u9EDE\u9078\u9B25\u72D7\uFF0C\u518D\u9EDE\u5C0D\u65B9\u72D7\u5C4B\u9032\u653B";
+    return "點選鬥士，再點對方狗屋進攻";
   }
   if (state.fever) return "Fever！攻擊 ×2，兩邊狗屋每 15 秒扣 20 血";
   return "";
 }
 function commandSelected(state, ids, hit, p) {
-  if (!ids.length) return false;
+  const mine = friendlyIds(state, ids);
+  if (!mine.length) return false;
+  if (hit.kind === "unit" && hit.team === TEAM.MALTESE) return false;
   if (hit.kind === "cake") {
-    const workers = ids.filter((id) => state.units.find((u) => u.id === id)?.type === "worker");
+    const workers = mine.filter((id) => state.units.find((u) => u.id === id)?.type === "worker");
     if (workers.length) {
       issue(state, { kind: "gather", ids: workers, node: hit.id });
-      const rest = ids.filter((id) => !workers.includes(id));
+      const rest = mine.filter((id) => !workers.includes(id));
       if (rest.length) issue(state, { kind: "move", ids: rest, x: p.x, y: p.y });
       return true;
     }
   }
   if (hit.kind === "unit" && hit.team !== TEAM.MALTESE) {
-    issue(state, { kind: "attack", ids, target: hit.id, tKind: "unit" });
+    issue(state, { kind: "attack", ids: mine, target: hit.id, tKind: "unit" });
     return true;
   }
   if (hit.kind === "house" && hit.team !== TEAM.MALTESE) {
-    issue(state, { kind: "attack", ids, target: hit.id, tKind: "house" });
+    issue(state, { kind: "attack", ids: mine, target: hit.id, tKind: "house" });
     return true;
   }
   if (hit.kind === "building" && hit.team !== TEAM.MALTESE) {
-    issue(state, { kind: "attack", ids, target: hit.id, tKind: "building" });
+    issue(state, { kind: "attack", ids: mine, target: hit.id, tKind: "building" });
     return true;
   }
-  issue(state, { kind: "move", ids, x: p.x, y: p.y });
+  issue(state, { kind: "move", ids: mine, x: p.x, y: p.y });
   return true;
 }
 function queuedCounts(state, team) {
@@ -1063,6 +1075,7 @@ export {
   constructionHint,
   createState,
   dist,
+  friendlyIds,
   hasReady,
   housePos,
   inspectCopy,

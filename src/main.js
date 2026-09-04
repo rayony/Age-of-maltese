@@ -1,7 +1,7 @@
 import { COSTS, MATCH_SECS, POP_CAP, TEAM } from "./config.js";
 import { tickAI } from "./ai.js";
 import { bootMuteFromStorage, isMuted, setMuted, setTrack, sfx, unlock } from "./audio.js";
-import { draw, drawPortrait, screenToWorld, viewFit } from "./render.js";
+import { draw, drawPortrait, screenToWorld, viewFit, clampPan } from "./render.js";
 import { loadSprites } from "./sprites.js";
 import {
   activeBuild,
@@ -13,6 +13,7 @@ import {
   hasReady,
   inspectCopy,
   issue,
+  friendlyIds,
   nextQueued,
   pickAt,
   queuedCounts,
@@ -130,22 +131,14 @@ canvas.addEventListener("wheel", (e) => {
   const after = screenToWorld(view, mx, my);
   cam.panX += (after.x - world.x) * view.scale;
   cam.panY += (after.y - world.y) * view.scale;
-  if (next <= 1.02) {
-    cam.zoom = 1;
-    cam.panX = 0;
-    cam.panY = 0;
-  }
+  clampPan(cam, r.width, r.height);
   view = viewFit(r.width, r.height, cam);
 }, { passive: false });
 
 function bumpZoom(dir) {
   const r = canvas.getBoundingClientRect();
   cam.zoom = Math.max(1, Math.min(2.6, cam.zoom + dir * 0.25));
-  if (cam.zoom <= 1.02) {
-    cam.zoom = 1;
-    cam.panX = 0;
-    cam.panY = 0;
-  }
+  clampPan(cam, r.width, r.height);
   view = viewFit(r.width, r.height, cam);
 }
 
@@ -284,8 +277,8 @@ function hud() {
   show(els.fever, state.feverFlash > 0);
 
   setDockBtn("worker", { disabled: cake < COSTS.worker || pop >= POP_CAP, vivid: cake >= COSTS.worker && pop < POP_CAP, label: `工狗 ${COSTS.worker}` });
-  setDockBtn("fighter", { disabled: cake < COSTS.fighter || !play || pop >= POP_CAP, vivid: cake >= COSTS.fighter && play && pop < POP_CAP, label: `鬥狗 ${COSTS.fighter}` });
-  setDockBtn("car", { disabled: cake < COSTS.car || !shop || pop >= POP_CAP, vivid: cake >= COSTS.car && shop && pop < POP_CAP, label: `狗車 ${COSTS.car}` });
+  setDockBtn("fighter", { disabled: cake < COSTS.fighter || !play || pop >= POP_CAP, vivid: cake >= COSTS.fighter && play && pop < POP_CAP, label: `鬥士 ${COSTS.fighter}` });
+  setDockBtn("car", { disabled: cake < COSTS.car || !shop || pop >= POP_CAP, vivid: cake >= COSTS.car && shop && pop < POP_CAP, label: `騎士 ${COSTS.car}` });
   setDockBtn("playground", {
     disabled: cake < COSTS.playground,
     vivid: cake >= COSTS.playground,
@@ -342,7 +335,7 @@ function hud() {
 
 function act(kind) {
   if (!state || state.winner || !running) return;
-  const ids = [...sel];
+  const ids = friendlyIds(state, [...sel]);
   const team = TEAM.MALTESE;
   if (kind === "worker") issue(state, { kind: "trainWorker", team });
   if (kind === "fighter") issue(state, { kind: "trainFighter", team });
@@ -383,8 +376,13 @@ canvas.addEventListener("pointerdown", (e) => {
     pinch = {
       dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1,
       zoom: cam.zoom,
+      panX: cam.panX,
+      panY: cam.panY,
+      midX: (pts[0].x + pts[1].x) / 2,
+      midY: (pts[0].y + pts[1].y) / 2,
     };
     hold = null;
+    marquee = null;
     return;
   }
   canvas.setPointerCapture(e.pointerId);
@@ -398,8 +396,16 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
   if (hit.kind === "unit" && hit.team === TEAM.MALTESE) {
-    if (!e.shiftKey) sel.clear();
-    sel.add(hit.id);
+    const already = sel.has(hit.id);
+    if (e.shiftKey) {
+      if (already) sel.delete(hit.id);
+      else sel.add(hit.id);
+    } else if (!already) {
+      sel.clear();
+      sel.add(hit.id);
+    } else {
+      hold.tapDeselect = true;
+    }
     inspect = { kind: "unit", id: hit.id };
     hold.dragUnit = true;
     sfx("select");
@@ -415,13 +421,12 @@ canvas.addEventListener("pointermove", (e) => {
     const r = canvas.getBoundingClientRect();
     const pts = [...pointers.values()];
     const distNow = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
-    const z = Math.max(1, Math.min(2.6, pinch.zoom * (distNow / pinch.dist)));
-    cam.zoom = z;
-    if (z <= 1.02) {
-      cam.zoom = 1;
-      cam.panX = 0;
-      cam.panY = 0;
-    }
+    const midX = (pts[0].x + pts[1].x) / 2;
+    const midY = (pts[0].y + pts[1].y) / 2;
+    cam.zoom = Math.max(1, Math.min(2.6, pinch.zoom * (distNow / pinch.dist)));
+    cam.panX = pinch.panX + (midX - pinch.midX);
+    cam.panY = pinch.panY + (midY - pinch.midY);
+    clampPan(cam, r.width, r.height);
     view = viewFit(r.width, r.height, cam);
     return;
   }
@@ -433,7 +438,7 @@ canvas.addEventListener("pointermove", (e) => {
     const now = performance.now();
     if (now - lastMoveCmd > 50) {
       lastMoveCmd = now;
-      issue(state, { kind: "move", ids: [...sel], x: p.x, y: p.y });
+      issue(state, { kind: "move", ids: friendlyIds(state, [...sel]), x: p.x, y: p.y });
     }
     return;
   }
@@ -455,7 +460,7 @@ canvas.addEventListener("pointerup", (e) => {
   const p = eventPos(e);
   const slop = Math.max(28, 26 / Math.max(0.2, view.scale));
   const hit = pickAt(state, p.x, p.y, null, slop);
-  const ids = [...sel];
+  const ids = friendlyIds(state, [...sel]);
 
   if (mode?.type === "place") {
     if (canPlace(state, p.x, p.y) && state.cake[0] >= COSTS[mode.what]) {
@@ -474,7 +479,7 @@ canvas.addEventListener("pointerup", (e) => {
     return;
   }
   if (mode?.type === "charge" && ids[0] != null) {
-    const u = state.units.find((x) => x.id === ids[0]);
+    const u = state.units.find((x) => x.id === ids[0] && x.team === TEAM.MALTESE);
     if (u) issue(state, { kind: "pilotShoot", id: u.id, x: p.x, y: p.y, charge: 1 });
     setMode(null);
     marquee = null;
@@ -507,10 +512,26 @@ canvas.addEventListener("pointerup", (e) => {
     marquee = null;
   }
 
-  if (hit.kind === "unit" && hit.team === TEAM.MALTESE && !h.moved && ids.length === 1 && ids[0] === hit.id) return;
-  if (ids.length) commandSelected(state, ids, hit, p);
+  if (hit.kind === "unit" && hit.team === TEAM.MALTESE && !h.moved) {
+    if (h.tapDeselect) {
+      sel.clear();
+      inspect = null;
+      return;
+    }
+    sel.clear();
+    sel.add(hit.id);
+    inspect = { kind: "unit", id: hit.id };
+    return;
+  }
+
+  if (!ids.length) {
+    if (hit.kind === "house" || hit.kind === "building" || hit.kind === "cake") inspect = { kind: hit.kind, id: hit.id };
+    else if (hit.kind === "unit") inspect = { kind: "unit", id: hit.id };
+    return;
+  }
+
+  commandSelected(state, ids, hit, p);
   if (hit.kind === "house" || hit.kind === "building" || hit.kind === "cake") inspect = { kind: hit.kind, id: hit.id };
-  else if (hit.kind === "unit") inspect = { kind: "unit", id: hit.id };
 });
 
 canvas.addEventListener("pointercancel", (e) => {
@@ -534,6 +555,7 @@ document.getElementById("titleHelp").onclick = () => show(els.help, true);
 document.getElementById("helpOk").onclick = () => show(els.help, false);
 document.getElementById("inspectClose").onclick = () => {
   inspect = null;
+  sel.clear();
   hud();
 };
 document.getElementById("zoomIn").onclick = () => bumpZoom(1);
@@ -579,6 +601,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     setMode(null);
     inspect = null;
+    sel.clear();
   }
   if (e.code === "Space" && screen === "play") {
     e.preventDefault();
@@ -600,7 +623,7 @@ function loop(now) {
   requestAnimationFrame(loop);
   const raw = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (!matchPaused) {
+  if (!matchPaused && (state.preview || (running && !state.winner))) {
     acc += raw;
     while (acc >= DT) {
       if (state.hitstop > 0) state.hitstop -= DT;

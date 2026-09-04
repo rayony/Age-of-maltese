@@ -3,6 +3,7 @@ import {
   buildingSpr,
   cakeSpr,
   carSpr,
+  carFrame,
   drawSpr,
   fighterFrame,
   houseSpr,
@@ -22,6 +23,19 @@ function viewFit(cw, ch, cam) {
     panX: cam?.panX ?? 0,
     panY: cam?.panY ?? 0
   };
+}
+function clampPan(cam, cw, ch) {
+  if (cam.zoom <= 1.02) {
+    cam.zoom = 1;
+    cam.panX = 0;
+    cam.panY = 0;
+    return;
+  }
+  const scale = Math.min(cw / W, ch / H) * cam.zoom;
+  const maxX = Math.max(0, (W * scale - cw) / 2 + 28);
+  const maxY = Math.max(0, (H * scale - ch) / 2 + 28);
+  cam.panX = Math.max(-maxX, Math.min(maxX, cam.panX));
+  cam.panY = Math.max(-maxY, Math.min(maxY, cam.panY));
 }
 function screenToWorld(view, sx, sy) {
   return { x: (sx - view.ox) / view.scale, y: (sy - view.oy) / view.scale };
@@ -488,14 +502,14 @@ function drawDog(ctx, u) {
   if (u.type === "fighter") {
     const img = fighterFrame(u.team, u.bob, moving > 0.3);
     if (img) {
-      drawSpr(ctx, img, 0, 16, 74, 74, u.facing < 0);
+      drawSpr(ctx, img, 0, 20, 96, 96, u.facing < 0);
       ctx.restore();
       return;
     }
   } else {
     const img = workerFrame(u.team, workerAction(u), u.bob);
     if (img) {
-      drawSpr(ctx, img, 0, 16, 64, 64, u.facing < 0);
+      drawSpr(ctx, img, 0, 20, 88, 88, u.facing < 0);
       ctx.restore();
       return;
     }
@@ -603,12 +617,13 @@ function drawDog(ctx, u) {
 }
 function drawCar(ctx, u) {
   const mal = u.team === TEAM.MALTESE;
+  const moving = Math.hypot(u.vx ?? 0, u.vy ?? 0) > 12 || u.order.type === "move" || u.order.type === "attack";
   const bob = Math.sin(u.bob * 14 + u.id) * 1.1;
   ctx.save();
   ctx.translate(0, bob);
-  const cimg = carSpr(u.team);
+  const cimg = carFrame(u.team, u.bob, moving, u.impact > 0) || carSpr(u.team);
   if (cimg) {
-    drawSpr(ctx, cimg, 0, 18, mal ? 96 : 90, mal ? 96 : 90, u.facing < 0);
+    drawSpr(ctx, cimg, 0, 22, mal ? 128 : 118, mal ? 128 : 118, u.facing < 0);
     ctx.restore();
     return;
   }
@@ -723,10 +738,10 @@ function drawUnit(ctx, u, selected, inspect) {
     ctx.stroke();
     ctx.setLineDash([]);
   }
-  ellipseShadow(ctx, 0, 16, 18, 7, 0.2);
+  ellipseShadow(ctx, 0, 16, u.type === "car" ? 22 : 20, 7, 0.2);
   if (u.type === "car") drawCar(ctx, u);
   else drawDog(ctx, u);
-  hpBar(ctx, -16, -34, 32, u.hp / u.maxHp, u.hurt > 0);
+  hpBar(ctx, -18, u.type === "car" ? -48 : -56, 36, u.hp / u.maxHp, u.hurt > 0);
   if (u.piloting || u.charge > 0.05) {
     ctx.save();
     ctx.strokeStyle = "#e07a8a";
@@ -896,5 +911,6 @@ export {
   drawPortrait,
   screenToWorld,
   viewFit,
+  clampPan,
   worldToScreen
 };
