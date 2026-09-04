@@ -1,0 +1,14 @@
+name: Game CI
+description: Syntax-check and run Age of Maltese unit tests
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+    - name: Syntax check
+      shell: bash
+      run: npm run check
+    - name: Unit tests
+      shell: bash
+      run: npm test
