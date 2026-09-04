@@ -196,15 +196,32 @@ function flowerPatch(ctx, x, y, t) {
 }
 function drawCake(ctx, n) {
   const empty = n.stock <= 0.2;
+  const dryCart = empty && n.kind === "home";
   const lvl = Math.max(0, n.stock / n.max);
   ctx.save();
   ctx.translate(n.x, n.y);
   ellipseShadow(ctx, 0, 18, 28, 8, 0.16);
   const img = cakeSpr(n.kind);
   if (img) {
-    ctx.globalAlpha = empty ? 0.45 : 1;
+    ctx.save();
+    if (dryCart) {
+      ctx.filter = "grayscale(1) brightness(0.92)";
+      ctx.globalAlpha = 0.5;
+    } else if (empty) {
+      ctx.globalAlpha = 0.85;
+    }
     drawSpr(ctx, img, 0, 22, n.kind === "home" ? 78 : 86, n.kind === "home" ? 78 : 86);
-    ctx.globalAlpha = 1;
+    ctx.restore();
+    if (dryCart) {
+      ctx.fillStyle = "rgba(42,34,24,0.72)";
+      round(ctx, -16, -6, 32, 16, 8);
+      ctx.fill();
+      ctx.fillStyle = "#fff6dc";
+      ctx.font = "700 12px 'Noto Sans TC', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("空", 0, 2);
+    }
     hpBar(ctx, -22, 24, 44, lvl);
     ctx.restore();
     return;

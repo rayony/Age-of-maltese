@@ -217,6 +217,9 @@ function enemyOf(state) {
 function isMelee(u) {
   return !!STATS[u.type].melee;
 }
+function isEmptyCart(n) {
+  return n.kind === "home" && n.stock <= 0.4;
+}
 function strikeDmg(state, u, tKind) {
   const s = STATS[u.type];
   let dmg = s.dmg * feverMul(state);
@@ -707,8 +710,18 @@ function tickUnit(state, u, dt) {
     const hunt = u.team !== playerTeam(state) || past || state.stance[u.team] === "attack";
     const best = hunt ? nearestEnemy(state, u, isMelee(u) ? s.range + 40 : s.range, true) : null;
     if (best && u.cd <= 0 && !state.preview) {
-      const aim = aimAt(u, best.t);
-      fire(state, u, aim.x, aim.y, 0, { id: best.t.id, kind: best.kind });
+      if (isMelee(u)) {
+        const d = dist(u, best.t);
+        const reach = s.range * 0.88 + ("r" in best.t ? best.t.r * 0.35 : 8);
+        if (d > reach) {
+          u.order = { type: "attack", target: best.t.id, tKind: best.kind };
+        } else {
+          meleeStrike(state, u, best.t, best.kind);
+        }
+      } else {
+        const aim = aimAt(u, best.t);
+        fire(state, u, aim.x, aim.y, 0, { id: best.t.id, kind: best.kind });
+      }
     }
   } else if (o.type === "idle" && u.type === "worker" && !state.preview) {
     u.vx = 0;
@@ -842,6 +855,8 @@ function issue(state, cmd) {
     return;
   }
   if (kind === "gather") {
+    const node = state.cakes.find((c) => c.id === cmd.node);
+    if (!node || isEmptyCart(node)) return;
     let any = false;
     for (const u of unitsByIds(state, cmd.ids)) {
       if (u.type !== "worker") continue;
@@ -850,8 +865,7 @@ function issue(state, cmd) {
       u.autoJob = true;
       any = true;
     }
-    const node = state.cakes.find((c) => c.id === cmd.node);
-    if (any && node) {
+    if (any) {
       state.markers.push({ x: node.x, y: node.y, t: 0, kind: "gather" });
       state.events.push("harvest");
     }
@@ -1169,7 +1183,7 @@ function inspectCopy(state, sel) {
     if (!n) return null;
     return {
       title: n.kind === "home" ? NAMES.home.zh : NAMES.well.zh,
-      sub: n.kind === "home" ? "\u4E0D\u518D\u751F \xB7 food cart" : "\u7DE9\u6162\u56DE\u88DC \xB7 cake shop",
+      sub: n.kind === "home" ? (n.stock <= 0.2 ? "空了 · 不再生" : "不再生 · food cart") : "緩慢回補 · cake shop",
       hp: Math.max(0, Math.ceil(n.stock)),
       maxHp: n.max,
       atk: "\u2014",
@@ -1206,6 +1220,8 @@ function commandSelected(state, ids, hit, p) {
   const me = playerTeam(state);
   if (hit.kind === "unit" && hit.team === me) return false;
   if (hit.kind === "cake") {
+    const node = state.cakes.find((c) => c.id === hit.id);
+    if (node && isEmptyCart(node)) return false;
     const workers = mine.filter((id) => state.units.find((u) => u.id === id)?.type === "worker");
     if (workers.length) {
       issue(state, { kind: "gather", ids: workers, node: hit.id });

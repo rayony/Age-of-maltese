@@ -5,7 +5,7 @@ export const MID_X = 800;
 export const POP_CAP = 10;
 export const MATCH_SECS = 180;
 export const WAIT_QUEUE_CAP = 5;
-export const GOLD_UNLOAD_CHANCE = 0.3;
+export const GOLD_UNLOAD_CHANCE = 0.1;
 
 export const TEAM = { MALTESE: 0, RETRIEVER: 1 };
 
@@ -48,11 +48,11 @@ export const TRAIN = {
   tower: 10,
 };
 
-// range: fighter melee (sheet 攻擊距離 1). Worker/rider stay hearts per issue #9.
+// range: everyone melee (issue #9). Towers / dog house stay ranged hearts.
 export const STATS = {
-  worker: { hp: 25, speed: 95, range: 150, dmg: 3, charged: 3, rof: 1, radius: 16, melee: false },
+  worker: { hp: 25, speed: 95, range: 42, dmg: 3, charged: 3, rof: 1, radius: 16, melee: true },
   fighter: { hp: 40, speed: 114, range: 42, dmg: 4, charged: 4, rof: 0.5, radius: 18, melee: true, vsBuilding: 2 },
-  car: { hp: 60, speed: 142, range: 185, dmg: 8, charged: 8, rof: 0.5, radius: 20, melee: false, vsUnit: 2 },
+  car: { hp: 60, speed: 142, range: 42, dmg: 8, charged: 8, rof: 0.5, radius: 20, melee: true, vsUnit: 2 },
 };
 
 export const HOUSE_HP = 500;

@@ -3,12 +3,17 @@ import { describe, it } from "node:test";
 import {
   COSTS,
   FEVER_DMG,
+  GOLD_UNLOAD_CHANCE,
+  HOME_STOCK,
   HOUSE_HP,
   MATCH_SECS,
   POP_CAP,
+  START,
+  STATS,
   TEAM,
   TRAIN,
   WELL_REGEN_CAP,
+  WELL_STOCK,
 } from "../src/config.js";
 import {
   activeBuild,
@@ -42,6 +47,11 @@ describe("match setup", () => {
     assert.equal(state.fever, false);
     assert.equal(state.cake[TEAM.MALTESE], 200);
     assert.equal(state.gold[TEAM.MALTESE], 0);
+    assert.equal(START.cake, 200);
+    for (const n of state.cakes) {
+      if (n.kind === "home") assert.equal(n.stock, HOME_STOCK);
+      if (n.kind === "well") assert.equal(n.stock, WELL_STOCK);
+    }
     assert.equal(teamPop(state, TEAM.MALTESE), 3);
     assert.equal(teamPop(state, TEAM.RETRIEVER), 2);
     assert.equal(state.units.filter((u) => u.team === TEAM.MALTESE && u.type === "worker").length, 2);
@@ -285,29 +295,36 @@ describe("config issues", () => {
     assert.ok(state.buildings.some((b) => b.kind === "tower" && b.team === TEAM.MALTESE));
   });
 
-  it("fighters melee instead of spawning hearts", () => {
+  it("all units melee; empty cart is not a gather; gold unloads at 10%", () => {
+    assert.equal(STATS.worker.melee, true);
+    assert.equal(STATS.fighter.melee, true);
+    assert.equal(STATS.car.melee, true);
+    assert.equal(GOLD_UNLOAD_CHANCE, 0.1);
+
     const state = createState("easy");
-    const f = state.units.find((u) => u.team === TEAM.MALTESE && u.type === "car");
-    assert.ok(f);
-    const foe = state.units.find((u) => u.team === TEAM.RETRIEVER);
-    issue(state, { kind: "attack", ids: [f.id], target: foe.id, tKind: "unit" });
-    drain(state, 0.05);
-    const fighter = {
-      ...state.units.find((u) => u.team === TEAM.MALTESE && u.type === "worker"),
-      type: "fighter",
-      x: foe.x + 20,
-      y: foe.y,
-      cd: 0,
-      order: { type: "attack", target: foe.id, tKind: "unit" },
-      hp: 40,
-      maxHp: 40,
-    };
-    fighter.id = 501;
-    state.units.push(fighter);
-    const hearts0 = state.hearts.length;
-    const hp0 = foe.hp;
-    drain(state, 0.2);
-    const after = state.units.find((u) => u.id === foe.id);
-    assert.ok(!after || after.hp < hp0 || state.hearts.length === hearts0);
+    const cart = state.cakes.find((c) => c.kind === "home");
+    cart.stock = 0;
+    const worker = state.units.find((u) => u.team === TEAM.MALTESE && u.type === "worker");
+    worker.autoJob = false;
+    worker.order = { type: "idle" };
+    const ok = commandSelected(state, [worker.id], { kind: "cake", id: cart.id }, { x: cart.x, y: cart.y });
+    assert.equal(ok, false);
+    assert.equal(worker.order.type, "idle");
+
+    const house = state.houses.find((h) => h.team === TEAM.MALTESE);
+    const shop = state.cakes.find((c) => c.kind === "well");
+    worker.x = house.x;
+    worker.y = house.y;
+    worker.carry = 10;
+    worker.order = { type: "gather", node: shop.id };
+    const orig = Math.random;
+    Math.random = () => 0.05;
+    try {
+      drain(state, 0.05);
+    } finally {
+      Math.random = orig;
+    }
+    assert.equal(state.gold[TEAM.MALTESE], 1);
+    assert.equal(worker.carry, 0);
   });
 });
