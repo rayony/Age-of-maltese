@@ -940,6 +940,10 @@ function issue(state, cmd) {
     state.cake[cmd.team] += 100;
     state.floaters.push({ x: 800, y: 80, text: "+100", t: 0, life: 0.9, rise: 24 });
   }
+  if (kind === "cheatGold") {
+    state.gold[cmd.team] = (state.gold[cmd.team] || 0) + 1;
+    state.floaters.push({ x: 800, y: 80, text: "+1幣", t: 0, life: 0.9, rise: 24 });
+  }
 }
 function applyStance(state, team, stance) {
   state.stance[team] = stance;
