@@ -4,7 +4,7 @@ Five-minute cute RTS. Command the original **Mallow** pack (white, Maltese-type)
 
 Inspired by the *feel* of line-drawn puppy games (including Maltese Snowwar), but every in-game character is an original drawing — not Super-Moco / 線條小狗 IP.
 
-**Play:** [rayony.github.io/Age-of-maltese](https://rayony.github.io/Age-of-maltese/)  
+**Play:** [maltese-rts.grok.me](https://maltese-rts.grok.me/)  
 Fallback: open `index.html` over HTTP (`npx serve .`).
 
 ## Prototype
