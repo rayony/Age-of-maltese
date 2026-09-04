@@ -34,6 +34,7 @@ import {
   GOLD_UNLOAD_CHANCE,
   WAIT_QUEUE_CAP,
 } from "./config.js";
+import { t } from "./i18n.js";
 let nid = 1;
 const nextId = () => nid++;
 function dist(a, b) {
@@ -142,7 +143,7 @@ function createState(difficulty = "easy", preview = false, playerTeamId = TEAM.M
     makeBuilding(TEAM.MALTESE, "playground", slots(TEAM.MALTESE).playground, 0),
     makeBuilding(TEAM.RETRIEVER, "tower", slots(TEAM.RETRIEVER).tower, 0)
   ] : [];
-  return {
+  const state = {
     t: 0,
     winner: null,
     difficulty,
@@ -152,6 +153,10 @@ function createState(difficulty = "easy", preview = false, playerTeamId = TEAM.M
     gold: [START.gold, START.gold],
     stance: [null, null],
     waitTrain: [[], []],
+    primary: [
+      { playground: null, workshop: null },
+      { playground: null, workshop: null },
+    ],
     houses,
     buildings,
     cakes,
@@ -170,6 +175,8 @@ function createState(difficulty = "easy", preview = false, playerTeamId = TEAM.M
     houseWarn: [0, 0],
     unitWarn: 0
   };
+  for (const b of state.buildings) ensurePrimary(state, b);
+  return state;
 }
 function makeBuilding(team, what, pos, buildLeft) {
   const hp = what === "tower" ? TOWER_HP : BUILDING_HP;
@@ -234,10 +241,76 @@ function friendlyIds(state, ids, team = playerTeam(state)) {
   const set = new Set(ids);
   return state.units.filter((u) => set.has(u.id) && u.team === team).map((u) => u.id);
 }
+function trainKind(unitType) {
+  if (unitType === "fighter") return "playground";
+  if (unitType === "car") return "workshop";
+  return "house";
+}
+function readyOf(state, team, kind) {
+  if (kind === "house") {
+    const h = state.houses.find((x) => x.team === team && x.hp > 0);
+    return h ? [h] : [];
+  }
+  return state.buildings.filter((b) => b.team === team && b.kind === kind && b.hp > 0 && b.buildLeft <= 0);
+}
+function trainFactor(state, team, bKind) {
+  if (bKind === "house" || !bKind) return 1;
+  const extras = Math.max(0, readyOf(state, team, bKind).length - 1);
+  return 0.5 ** extras;
+}
+function trainCost(state, team, unitType) {
+  const base = COSTS[unitType] || 0;
+  return Math.max(1, Math.round(base * trainFactor(state, team, trainKind(unitType))));
+}
+function trainTime(state, team, unitType) {
+  return Math.max(0.25, TRAIN[unitType] * trainFactor(state, team, trainKind(unitType)));
+}
+function isPrimary(state, b) {
+  if (!b || (b.kind !== "playground" && b.kind !== "workshop")) return false;
+  return state.primary?.[b.team]?.[b.kind] === b.id;
+}
+function ensurePrimary(state, b) {
+  if (!b || (b.kind !== "playground" && b.kind !== "workshop")) return;
+  if (b.hp <= 0 || b.buildLeft > 0) return;
+  if (!state.primary[b.team]) state.primary[b.team] = { playground: null, workshop: null };
+  if (!state.primary[b.team][b.kind]) state.primary[b.team][b.kind] = b.id;
+}
+function sweepPrimaries(state) {
+  for (const team of [TEAM.MALTESE, TEAM.RETRIEVER]) {
+    for (const kind of ["playground", "workshop"]) {
+      primaryOf(state, team, kind);
+    }
+  }
+}
+function primaryOf(state, team, kind) {
+  if (kind === "house") return state.houses.find((h) => h.team === team) || null;
+  const live = readyOf(state, team, kind);
+  if (!state.primary[team]) state.primary[team] = { playground: null, workshop: null };
+  const id = state.primary[team][kind];
+  const hit = live.find((b) => b.id === id);
+  if (hit) return hit;
+  const next = live[0] || null;
+  state.primary[team][kind] = next ? next.id : null;
+  return next;
+}
+function setPrimary(state, team, id) {
+  const b = state.buildings.find((x) => x.id === id && x.team === team);
+  if (!b || (b.kind !== "playground" && b.kind !== "workshop")) return false;
+  if (b.buildLeft > 0 || b.hp <= 0) return false;
+  if (readyOf(state, team, b.kind).length < 2) return false;
+  const old = primaryOf(state, team, b.kind);
+  if (old && old.id !== b.id && old.queue && !b.queue) {
+    b.queue = old.queue;
+    b.queueT = old.queueT;
+    b.queueMax = old.queueMax;
+    old.queue = null;
+    old.queueT = 0;
+  }
+  state.primary[team][b.kind] = b.id;
+  return true;
+}
 function buildingOf(state, team, kind) {
-  if (kind === "house") return state.houses.find((h) => h.team === team);
-  const ready = state.buildings.filter((b) => b.team === team && b.kind === kind && b.hp > 0 && b.buildLeft <= 0);
-  return ready.find((b) => !b.queue) || ready[0] || null;
+  return primaryOf(state, team, kind);
 }
 function hasReady(state, team, kind) {
   return state.buildings.some((b) => b.team === team && b.kind === kind && b.hp > 0 && b.buildLeft <= 0);
@@ -273,18 +346,19 @@ function cutInBuild(state, team) {
   next.phase = "building";
 }
 function queueAt(state, team, bKind, unitType) {
-  const b = buildingOf(state, team, bKind);
+  const b = primaryOf(state, team, bKind);
   if (!b) return false;
-  const cost = COSTS[unitType];
+  const cost = trainCost(state, team, unitType);
+  const time = trainTime(state, team, unitType);
   if (b.queue || state.cake[team] < cost || teamPop(state, team) >= POP_CAP) {
     if ((state.waitTrain[team] || []).length >= WAIT_QUEUE_CAP) return false;
-    state.waitTrain[team].push({ unitType, bKind, cost });
+    state.waitTrain[team].push({ unitType, bKind });
     return true;
   }
   if (!spend(state, team, cost)) return false;
   b.queue = unitType;
-  b.queueT = TRAIN[unitType];
-  b.queueMax = TRAIN[unitType];
+  b.queueT = time;
+  b.queueMax = time;
   state.events.push("train");
   return true;
 }
@@ -293,14 +367,16 @@ function flushWaitTrain(state, team) {
   if (!list?.length) return;
   const next = list[0];
   if (teamPop(state, team) >= POP_CAP) return;
-  if (state.cake[team] < next.cost) return;
-  const b = buildingOf(state, team, next.bKind);
+  const cost = trainCost(state, team, next.unitType);
+  if (state.cake[team] < cost) return;
+  const b = primaryOf(state, team, next.bKind);
   if (!b || b.queue) return;
-  if (!spend(state, team, next.cost)) return;
+  if (!spend(state, team, cost)) return;
   list.shift();
+  const time = trainTime(state, team, next.unitType);
   b.queue = next.unitType;
-  b.queueT = TRAIN[next.unitType];
-  b.queueMax = TRAIN[next.unitType];
+  b.queueT = time;
+  b.queueMax = time;
   state.events.push("train");
 }
 function canPlace(state, x, y) {
@@ -889,6 +965,7 @@ function issue(state, cmd) {
     u.order = { type: "idle" };
     u.charge = 0;
   }
+  if (kind === "setPrimary") return setPrimary(state, cmd.team, cmd.id);
   if (kind === "stance") applyStance(state, cmd.team, cmd.stance);
   if (kind === "cheatCake") {
     state.cake[cmd.team] += 100;
@@ -943,7 +1020,6 @@ function step(state, dt, clockDt = dt) {
     }
     for (const team of [TEAM.MALTESE, TEAM.RETRIEVER]) {
       payWaitingBuilds(state, team);
-      flushWaitTrain(state, team);
       promoteQueue(state, team);
       const cur = activeBuild(state, team);
       if (cur && !state.buildPaused[team]) {
@@ -951,10 +1027,12 @@ function step(state, dt, clockDt = dt) {
         if (cur.buildLeft <= 0) {
           cur.buildLeft = 0;
           cur.phase = "done";
+          ensurePrimary(state, cur);
           promoteQueue(state, team);
           state.puffs.push({ x: cur.x, y: cur.y, t: 0, life: 0.45, r: 28, hue: "cream" });
         }
       }
+      flushWaitTrain(state, team);
     }
     for (const b of state.buildings) {
       if (b.buildLeft <= 0) tickQueue(state, b, dt);
@@ -989,6 +1067,7 @@ function step(state, dt, clockDt = dt) {
   state.units = state.units.filter((u) => u.hp > 0);
   if (state.units.length < before) state.events.push("death");
   state.buildings = state.buildings.filter((b) => b.hp > 0);
+  sweepPrimaries(state);
   for (const p of state.puffs) p.t += dt;
   state.puffs = state.puffs.filter((p) => p.t < p.life);
   for (const f of state.floaters) f.t += dt;
@@ -1143,25 +1222,53 @@ function inspectCopy(state, sel) {
     const b = state.buildings.find((x) => x.id === sel.id);
     if (!b) return null;
     const mine = b.team === playerTeam(state);
+    const team = b.team;
     const building = b.buildLeft > 0;
-    const trainP = !building && b.queue ? 1 - b.queueT / b.queueMax : null;
+    const prim = primaryOf(state, team, b.kind);
+    const factor = trainFactor(state, team, b.kind);
+    const fighterCost = trainCost(state, team, "fighter");
+    const carCost = trainCost(state, team, "car");
+    const primBusy = !!(prim && prim.queue);
+    const copies = readyOf(state, team, b.kind).length;
+    const amPrimary = isPrimary(state, b);
+    const trainP = !building && primBusy ? 1 - prim.queueT / prim.queueMax : null;
     const buildP = building ? 1 - b.buildLeft / b.buildMax : null;
+    const trainKindId = b.kind === "playground" ? "fighter" : b.kind === "workshop" ? "car" : null;
+    const trainLabel = b.kind === "playground"
+      ? `${t("trainFighter")} ${fighterCost}`
+      : b.kind === "workshop"
+        ? `${t("trainCar")} ${carCost}`
+        : "";
+    const trainEnabled = trainKindId
+      ? state.cake[playerTeam(state)] >= (trainKindId === "fighter" ? fighterCost : carCost)
+        && teamPop(state, playerTeam(state)) < POP_CAP
+        && !primBusy
+        && !!prim
+      : false;
     const actions = mine ? [
-      ...b.kind === "playground" && !building ? [{ id: "fighter", label: "訓練鬥士", enabled: state.cake[playerTeam(state)] >= COSTS.fighter && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
-      ...b.kind === "workshop" && !building ? [{ id: "car", label: "訓練騎士", enabled: state.cake[playerTeam(state)] >= COSTS.car && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
+      ...trainKindId && !building ? [{ id: trainKindId, label: trainLabel, enabled: trainEnabled }] : [],
+      ...!building && (b.kind === "playground" || b.kind === "workshop") && copies > 1 && !amPrimary
+        ? [{ id: "setPrimary", label: t("setPrimary"), enabled: true }]
+        : [],
       { id: "rally", label: "\u8A2D\u96C6\u7D50\u9EDE", enabled: true }
     ] : [];
+    let status;
+    if (building) status = b.phase === "queued" ? "\u6392\u968A\u4E2D" : "\u5EFA\u9020\u4E2D";
+    else if (amPrimary && prim?.queue) status = `\u8A13\u7DF4 ${NAMES[prim.queue].zh}`;
+    else if (amPrimary) status = t("primaryMark");
+    else if (factor < 1) status = `${t("buffStatus")} \xB7 \xD7${factor}`;
+    else status = "\u5C31\u7DD2";
     return {
-      title: NAMES[b.kind].zh,
+      title: NAMES[b.kind].zh + (amPrimary && !building ? ` · ${t("primaryMark")}` : ""),
       sub: NAMES[b.kind].en,
       hp: Math.max(0, Math.ceil(b.hp)),
       maxHp: b.maxHp,
       atk: b.kind === "tower" ? String(Math.round(TOWER_ATK.dmg * feverMul(state))) : "\u2014",
-      status: building ? b.phase === "queued" ? "\u6392\u968A\u4E2D" : "\u5EFA\u9020\u4E2D" : b.queue ? `\u8A13\u7DF4 ${NAMES[b.queue].zh}` : "\u5C31\u7DD2",
+      status,
       team: b.team,
       kind: b.kind,
       actions,
-      progress: buildP != null ? { label: "\u8208\u5EFA", p: buildP } : trainP != null ? { label: "\u8A13\u7DF4", p: trainP } : null
+      progress: buildP != null ? { label: "\u8208\u5EFA", p: buildP } : trainP != null && amPrimary ? { label: "\u8A13\u7DF4", p: trainP } : null
     };
   }
   if (sel.kind === "cake") {
@@ -1251,14 +1358,19 @@ export {
   hasReady,
   housePos,
   inspectCopy,
+  isPrimary,
   issue,
   nearestCakeShop,
   nearestStockedCake,
   nextQueued,
   pickAt,
+  primaryOf,
   queuedCounts,
   skipToFever,
   statusOf,
   step,
-  teamPop
+  teamPop,
+  trainCost,
+  trainFactor,
+  trainTime,
 };

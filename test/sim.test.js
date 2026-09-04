@@ -22,6 +22,10 @@ import {
   skipToFever,
   step,
   teamPop,
+  trainCost,
+  trainTime,
+  primaryOf,
+  isPrimary,
 } from "../src/sim.js";
 
 function drain(state, seconds) {
@@ -309,5 +313,103 @@ describe("config issues", () => {
     drain(state, 0.2);
     const after = state.units.find((u) => u.id === foe.id);
     assert.ok(!after || after.hp < hp0 || state.hearts.length === hearts0);
+  });
+});
+
+describe("issue #17 primary gym / toy", () => {
+  function finishGym(state, x, y) {
+    issue(state, { kind: "build", team: TEAM.MALTESE, what: "playground", x, y });
+    drain(state, TRAIN.playground + 0.2);
+  }
+
+  it("only the first gym trains; extras discount cost and time", () => {
+    const state = createState("easy");
+    state.cake[TEAM.MALTESE] = 999;
+    finishGym(state, 1100, 200);
+    const first = state.buildings.find((b) => b.kind === "playground");
+    assert.equal(isPrimary(state, first), true);
+    assert.equal(trainCost(state, TEAM.MALTESE, "fighter"), COSTS.fighter);
+
+    finishGym(state, 1100, 360);
+    const gyms = state.buildings.filter((b) => b.kind === "playground" && b.team === TEAM.MALTESE);
+    assert.equal(gyms.length, 2);
+    assert.equal(trainCost(state, TEAM.MALTESE, "fighter"), Math.round(COSTS.fighter * 0.5));
+    assert.equal(trainTime(state, TEAM.MALTESE, "fighter"), TRAIN.fighter * 0.5);
+
+    const cake0 = state.cake[TEAM.MALTESE];
+    issue(state, { kind: "trainFighter", team: TEAM.MALTESE });
+    const prim = primaryOf(state, TEAM.MALTESE, "playground");
+    const extra = gyms.find((b) => b.id !== prim.id);
+    assert.equal(prim.queue, "fighter");
+    assert.equal(extra.queue, null);
+    assert.equal(state.cake[TEAM.MALTESE], cake0 - Math.round(COSTS.fighter * 0.5));
+
+    finishGym(state, 960, 200);
+    assert.equal(trainCost(state, TEAM.MALTESE, "fighter"), Math.round(COSTS.fighter * 0.25));
+  });
+
+  it("destroyed extra drops the discount; destroyed primary auto-promotes", () => {
+    const state = createState("easy");
+    state.cake[TEAM.MALTESE] = 999;
+    finishGym(state, 1100, 200);
+    finishGym(state, 1100, 360);
+    const prim = primaryOf(state, TEAM.MALTESE, "playground");
+    const extra = state.buildings.find((b) => b.kind === "playground" && b.id !== prim.id);
+    extra.hp = 0;
+    drain(state, 0.05);
+    assert.equal(trainCost(state, TEAM.MALTESE, "fighter"), COSTS.fighter);
+    assert.equal(primaryOf(state, TEAM.MALTESE, "playground")?.id, prim.id);
+
+    const only = primaryOf(state, TEAM.MALTESE, "playground");
+    finishGym(state, 960, 360);
+    const next = state.buildings.find((b) => b.kind === "playground" && b.id !== only.id);
+    only.hp = 0;
+    drain(state, 0.05);
+    const promoted = primaryOf(state, TEAM.MALTESE, "playground");
+    assert.ok(promoted);
+    assert.equal(promoted.id, next.id);
+  });
+
+  it("setPrimary moves an in-progress train to the new gym", () => {
+    const state = createState("easy");
+    state.cake[TEAM.MALTESE] = 999;
+    finishGym(state, 1100, 200);
+    finishGym(state, 1100, 360);
+    issue(state, { kind: "trainFighter", team: TEAM.MALTESE });
+    const old = primaryOf(state, TEAM.MALTESE, "playground");
+    const extra = state.buildings.find((b) => b.kind === "playground" && b.id !== old.id);
+    issue(state, { kind: "setPrimary", team: TEAM.MALTESE, id: extra.id });
+    assert.equal(primaryOf(state, TEAM.MALTESE, "playground").id, extra.id);
+    assert.equal(extra.queue, "fighter");
+    assert.equal(old.queue, null);
+  });
+
+  it("wait-queue spends the live discounted cost when the train starts", () => {
+    const state = createState("easy");
+    for (const u of state.units) {
+      u.autoJob = false;
+      u.order = { type: "wait", x: u.x, y: u.y };
+    }
+    state.cake[TEAM.MALTESE] = 999;
+    finishGym(state, 1100, 200);
+    state.cake[TEAM.MALTESE] = 10;
+    issue(state, { kind: "trainFighter", team: TEAM.MALTESE });
+    assert.equal(state.waitTrain[TEAM.MALTESE].length, 1);
+
+    state.cake[TEAM.MALTESE] = 999;
+    issue(state, { kind: "build", team: TEAM.MALTESE, what: "playground", x: 1100, y: 360 });
+    state.cake[TEAM.MALTESE] = 20;
+    drain(state, TRAIN.playground + 0.2);
+    assert.equal(state.waitTrain[TEAM.MALTESE].length, 1);
+    assert.equal(primaryOf(state, TEAM.MALTESE, "playground").queue, null);
+    assert.equal(trainCost(state, TEAM.MALTESE, "fighter"), Math.round(COSTS.fighter * 0.5));
+
+    state.cake[TEAM.MALTESE] = Math.round(COSTS.fighter * 0.5);
+    drain(state, 0.2);
+    const prim = primaryOf(state, TEAM.MALTESE, "playground");
+    assert.equal(prim.queue, "fighter");
+    assert.equal(state.waitTrain[TEAM.MALTESE].length, 0);
+    assert.equal(prim.queueMax, TRAIN.fighter * 0.5);
+    assert.equal(state.cake[TEAM.MALTESE], 0);
   });
 });

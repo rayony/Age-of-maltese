@@ -22,6 +22,7 @@ import {
   step,
   teamPop,
   playerTeam,
+  trainCost,
 } from "./sim.js";
 
 loadSprites();
@@ -295,9 +296,12 @@ function hud() {
 
   const gold = state.gold[team] || 0;
   const waitN = (state.waitTrain[team] || []).length;
-  setDockBtn("worker", { disabled: pop >= POP_CAP && waitN >= 5, vivid: cake >= COSTS.worker && pop < POP_CAP, label: `${NAMES.worker.zh} ${COSTS.worker}` });
-  setDockBtn("fighter", { disabled: !play, vivid: cake >= COSTS.fighter && play && pop < POP_CAP, label: `${NAMES.fighter.zh} ${COSTS.fighter}` });
-  setDockBtn("car", { disabled: !shop, vivid: cake >= COSTS.car && shop && pop < POP_CAP, label: `${NAMES.car.zh} ${COSTS.car}` });
+  const fighterCost = trainCost(state, team, "fighter");
+  const carCost = trainCost(state, team, "car");
+  const workerCost = trainCost(state, team, "worker");
+  setDockBtn("worker", { disabled: pop >= POP_CAP && waitN >= 5, vivid: cake >= workerCost && pop < POP_CAP, label: `${NAMES.worker.zh} ${workerCost}` });
+  setDockBtn("fighter", { disabled: !play, vivid: cake >= fighterCost && play && pop < POP_CAP, label: `${NAMES.fighter.zh} ${fighterCost}` });
+  setDockBtn("car", { disabled: !shop, vivid: cake >= carCost && shop && pop < POP_CAP, label: `${NAMES.car.zh} ${carCost}` });
   setDockBtn("playground", {
     disabled: false,
     vivid: cake >= COSTS.playground,
@@ -395,6 +399,9 @@ function act(kind) {
     sel.clear();
     inspect = null;
     hud();
+  }
+  if (kind === "setPrimary" && inspect?.kind === "building") {
+    issue(state, { kind: "setPrimary", team, id: inspect.id });
   }
 }
 
