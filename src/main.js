@@ -1,5 +1,5 @@
-import { COSTS, GOLD_COSTS, MATCH_SECS, NAMES, POP_CAP, TEAM, TEAM_NAME, TEAM_NAME_ZH } from "./config.js";
-import { t, getLang, setLang, teamLabel } from "./i18n.js";
+import { COSTS, GOLD_COSTS, MATCH_SECS, POP_CAP, TEAM } from "./config.js";
+import { LANGS, locName, t, getLang, setLang, teamName } from "./i18n.js";
 import { tickAI } from "./ai.js";
 import { bootMuteFromStorage, isMuted, setMuted, setTrack, sfx, unlock } from "./audio.js";
 import { draw, drawPortrait, screenToWorld, viewFit, clampPan } from "./render.js";
@@ -96,17 +96,17 @@ function show(el, on) {
   el.classList.toggle("hidden", !on);
 }
 
-function formatClock(t) {
-  if (t < MATCH_SECS) {
-    const left = Math.max(0, Math.ceil(MATCH_SECS - t));
+function formatClock(secs) {
+  if (secs < MATCH_SECS) {
+    const left = Math.max(0, Math.ceil(MATCH_SECS - secs));
     const mm = String(Math.floor(left / 60)).padStart(2, "0");
     const ss = String(left % 60).padStart(2, "0");
-    return { clock: `${mm}:${ss}`, label: "Countdown" };
+    return { clock: `${mm}:${ss}`, label: t("clockCountdown") };
   }
-  const over = Math.floor(t - MATCH_SECS);
+  const over = Math.floor(secs - MATCH_SECS);
   const mm = String(Math.floor(over / 60)).padStart(2, "0");
   const ss = String(over % 60).padStart(2, "0");
-  return { clock: `${mm}:${ss}`, label: "Fever ×2" };
+  return { clock: `${mm}:${ss}`, label: t("clockFever") };
 }
 
 function setMode(m) {
@@ -263,8 +263,8 @@ function hud() {
   els.mallowFill.style.background = mP > 0.35 ? "var(--hp)" : "var(--roof)";
   const maltese = state.houses.find((h) => h.team === TEAM.MALTESE);
   const retriever = state.houses.find((h) => h.team === TEAM.RETRIEVER);
-  document.querySelector(".side-hp.right .name").textContent = teamLabel(0, TEAM_NAME_ZH[0], TEAM_NAME[0]);
-  document.querySelector(".side-hp.left .name").textContent = teamLabel(1, TEAM_NAME_ZH[1], TEAM_NAME[1]);
+  document.querySelector(".side-hp.right .name").textContent = teamName(TEAM.MALTESE);
+  document.querySelector(".side-hp.left .name").textContent = teamName(TEAM.RETRIEVER);
   document.querySelector(".side-hp.right").classList.toggle("warn", (state.houseWarn[TEAM.MALTESE] || 0) > 0);
   document.querySelector(".side-hp.left").classList.toggle("warn", (state.houseWarn[TEAM.RETRIEVER] || 0) > 0);
 
@@ -274,22 +274,22 @@ function hud() {
   let banner = "";
   let bannerClass = "banner";
   if (mode?.type === "place") {
-    banner = "點地圖放置 · 右鍵取消";
+    banner = t("placeHint");
     bannerClass += " place";
   } else if (mode?.type === "rally") {
-    banner = "點地圖設集結點";
+    banner = t("rallyHint");
     bannerClass += " place";
   } else if (mode?.type === "charge") {
-    banner = "點目標射出蓄力愛心";
+    banner = t("chargeHint");
     bannerClass += " place";
   } else if (mode?.type === "towerAim") {
-    banner = "點敵人指定塔攻擊 · 點空地恢復自動";
+    banner = t("towerAimHint");
     bannerClass += " place";
   } else if (state.houseWarn[0] > 0 && screen === "play") {
-    banner = "狗屋被打！";
+    banner = t("houseHit");
     bannerClass += " warn";
   } else if (state.unitWarn > 0 && screen === "play") {
-    banner = "部隊被打";
+    banner = t("unitHit");
     bannerClass += " warn";
   } else if (con && screen === "play") banner = con;
   else if (hint && screen === "play") banner = hint;
@@ -299,33 +299,33 @@ function hud() {
 
   const gold = state.gold[team] || 0;
   const waitN = (state.waitTrain[team] || []).length;
-  setDockBtn("worker", { disabled: pop >= POP_CAP && waitN >= 5, vivid: cake >= COSTS.worker && pop < POP_CAP, label: `${NAMES.worker.zh} ${COSTS.worker}` });
-  setDockBtn("fighter", { disabled: !play, vivid: cake >= COSTS.fighter && play && pop < POP_CAP, label: `${NAMES.fighter.zh} ${COSTS.fighter}` });
-  setDockBtn("car", { disabled: !shop, vivid: cake >= COSTS.car && shop && pop < POP_CAP, label: `${NAMES.car.zh} ${COSTS.car}` });
+  setDockBtn("worker", { disabled: pop >= POP_CAP && waitN >= 5, vivid: cake >= COSTS.worker && pop < POP_CAP, label: `${locName("worker")} ${COSTS.worker}` });
+  setDockBtn("fighter", { disabled: !play, vivid: cake >= COSTS.fighter && play && pop < POP_CAP, label: `${locName("fighter")} ${COSTS.fighter}` });
+  setDockBtn("car", { disabled: !shop, vivid: cake >= COSTS.car && shop && pop < POP_CAP, label: `${locName("car")} ${COSTS.car}` });
   setDockBtn("playground", {
     disabled: false,
     vivid: cake >= COSTS.playground,
     active: mode?.type === "place" && mode.what === "playground",
-    label: `${qLabel("playground", NAMES.playground.zh)} ${COSTS.playground}`,
+    label: `${qLabel("playground", locName("playground"))} ${COSTS.playground}`,
   });
   setDockBtn("workshop", {
     disabled: false,
     vivid: cake >= COSTS.workshop,
     active: mode?.type === "place" && mode.what === "workshop",
-    label: `${qLabel("workshop", NAMES.workshop.zh)} ${COSTS.workshop}`,
+    label: `${qLabel("workshop", locName("workshop"))} ${COSTS.workshop}`,
   });
   setDockBtn("tower", {
     disabled: false,
     vivid: gold >= (GOLD_COSTS.tower || 0),
     active: mode?.type === "place" && mode.what === "tower",
-    label: `${qLabel("tower", NAMES.tower.zh)} ${GOLD_COSTS.tower}幣`,
+    label: `${qLabel("tower", locName("tower"))} ${GOLD_COSTS.tower}${t("goldUnit")}`,
   });
   setDockBtn("stanceHarvest", { active: state.stance[team] === "harvest" });
   setDockBtn("stanceAttack", { active: state.stance[team] === "attack" });
   setDockBtn("stanceDefend", { active: state.stance[team] === "defend" });
   setDockBtn("pauseBuild", {
     disabled: !site,
-    label: state.buildPaused[team] ? "續建" : "全停",
+    label: state.buildPaused[team] ? t("resumeBuild") : t("pauseBuild"),
   });
   setDockBtn("cutBuild", { disabled: !nextQueued(state, team) });
 
@@ -650,31 +650,60 @@ document.querySelectorAll("[data-side]").forEach((btn) => {
     document.querySelectorAll("[data-side]").forEach((b) => b.classList.toggle("on", b === btn));
   });
 });
-document.querySelectorAll("[data-lang]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    setLang(btn.dataset.lang);
-    applyLang();
+
+function bindLangRow() {
+  const row = document.querySelector(".lang-row");
+  if (!row) return;
+  row.setAttribute("role", "listbox");
+  row.setAttribute("aria-label", t("langAria"));
+  row.innerHTML = LANGS.map((l) => `<button type="button" data-lang="${l.id}" role="option">${l.label}</button>`).join("");
+  row.querySelectorAll("[data-lang]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setLang(btn.dataset.lang);
+      applyLang();
+      hud();
+    });
   });
-});
+}
+
 function applyLang() {
   const L = getLang();
-  document.documentElement.lang = L === "en" ? "en" : "zh-Hant";
-  document.querySelectorAll("[data-lang]").forEach((b) => b.classList.toggle("on", b.dataset.lang === L));
-  const map = [
-    ["easy", "easy"], ["hard", "hard"], ["titleHelp", "how"], ["helpOk", "how"],
-    ["resume", "resume"], ["toTitle", "toTitle"], ["again", "again"],
-  ];
-  const easy = document.getElementById("easy"); if (easy) easy.textContent = t("easy");
-  const hard = document.getElementById("hard"); if (hard) hard.textContent = t("hard");
-  const th = document.getElementById("titleHelp"); if (th) th.textContent = t("how");
-  const ho = document.getElementById("helpOk"); if (ho) ho.textContent = L === "en" ? "Got it" : "知道了";
-  const resume = document.getElementById("resume"); if (resume) resume.textContent = t("resume");
-  const toTitle = document.getElementById("toTitle"); if (toTitle) toTitle.textContent = t("toTitle");
-  const again = document.getElementById("again"); if (again) again.textContent = t("again");
-  const kicker = document.querySelector(".kicker"); if (kicker) kicker.textContent = t("kicker");
-  const blurb = document.getElementById("titleBlurb"); if (blurb) blurb.textContent = t("blurb");
-  const fine = document.getElementById("titleFine"); if (fine) fine.textContent = t("musicHint");
-  const pausedH = document.querySelector("#paused h2"); if (pausedH) pausedH.textContent = t("paused");
+  const meta = LANGS.find((l) => l.id === L);
+  document.documentElement.lang = meta?.html ?? "zh-Hant";
+  document.querySelectorAll("[data-lang]").forEach((b) => {
+    const on = b.dataset.lang === L;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  const setTxt = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t(key);
+  };
+  setTxt("easy", "easy");
+  setTxt("hard", "hard");
+  setTxt("titleHelp", "how");
+  setTxt("helpOk", "howOk");
+  setTxt("helpTitle", "how");
+  setTxt("helpFine", "helpFine");
+  setTxt("resume", "resume");
+  setTxt("toTitle", "toTitle");
+  setTxt("again", "again");
+  setTxt("titleBlurb", "blurb");
+  setTxt("titleFine", "musicHint");
+  setTxt("pausedFine", "pausedFine");
+  setTxt("feverSub", "feverSub");
+  setTxt("insAtkLabel", "atk");
+  setTxt("insStLabel", "status");
+  const kicker = document.querySelector(".kicker");
+  if (kicker) kicker.textContent = t("kicker");
+  const fineTitle = document.querySelector(".fine-title");
+  if (fineTitle) fineTitle.textContent = t("fineTitle");
+  const pausedH = document.querySelector("#paused h2");
+  if (pausedH) pausedH.textContent = t("paused");
+  const helpList = document.getElementById("helpList");
+  if (helpList) {
+    helpList.innerHTML = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `<li>${t("help" + n)}</li>`).join("");
+  }
   document.querySelectorAll("[data-tab=units]").forEach((b) => { b.textContent = t("units"); });
   document.querySelectorAll("[data-tab=build]").forEach((b) => { b.textContent = t("build"); });
   const sh = document.querySelector("[data-act=stanceHarvest]"); if (sh) sh.textContent = t("harvest");
@@ -682,7 +711,25 @@ function applyLang() {
   const sd = document.querySelector("[data-act=stanceDefend]"); if (sd) sd.textContent = t("defend");
   const st = document.querySelector("[data-act=stop]"); if (st) st.textContent = t("stop");
   const cs = document.querySelector("[data-act=clearSel]"); if (cs) cs.textContent = t("clearSel");
+  const pb = document.querySelector("[data-act=pauseBuild]");
+  if (pb && !running) pb.textContent = t("pauseBuild");
+  const cb = document.querySelector("[data-act=cutBuild]"); if (cb) cb.textContent = t("cutBuild");
+  document.querySelectorAll("[data-side]").forEach((btn) => {
+    const span = btn.querySelector("span");
+    const team = Number(btn.dataset.side);
+    if (span) span.textContent = teamName(team);
+    const img = btn.querySelector("img");
+    if (img) img.alt = teamName(team);
+  });
+  const cake = document.getElementById("cakeChip");
+  if (cake) cake.title = t("cheatCake");
+  const gold = document.getElementById("goldChip");
+  if (gold) gold.title = t("cheatGold");
+  const clock = document.getElementById("clockBtn");
+  if (clock) clock.title = t("cheatClock");
 }
+
+bindLangRow();
 applyLang();
 
 document.getElementById("muteBtn").onclick = () => {

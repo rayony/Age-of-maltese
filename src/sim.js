@@ -26,14 +26,12 @@ import {
   WELL_SLOTS,
   HEART_SPEED,
   HEART_R,
-  NAMES,
-  TEAM_NAME,
-  TEAM_NAME_ZH,
   START,
   GOLD_COSTS,
   GOLD_UNLOAD_CHANCE,
   WAIT_QUEUE_CAP,
 } from "./config.js";
+import { getLang, locName, otherLocName, otherTeamName, t, teamName } from "./i18n.js";
 let nid = 1;
 const nextId = () => nid++;
 function dist(a, b) {
@@ -1099,38 +1097,40 @@ function constructionHint(state, team) {
   const list = unfinished(state, team);
   if (!list.length) return "";
   const names = {
-    playground: NAMES.playground.zh,
-    workshop: NAMES.workshop.zh,
-    tower: NAMES.tower.zh
+    playground: locName("playground"),
+    workshop: locName("workshop"),
+    tower: locName("tower"),
   };
+  const sep = getLang() === "en" ? ", " : "、";
   const tally = (arr) => {
     const m = {};
     for (const b of arr) m[b.kind] = (m[b.kind] ?? 0) + 1;
-    return Object.entries(m).map(([k, n]) => n > 1 ? `${names[k]}\xD7${n}` : names[k]).join("\u3001");
+    return Object.entries(m).map(([k, n]) => n > 1 ? `${names[k]}×${n}` : names[k]).join(sep);
   };
   if (state.buildPaused[team]) {
     const cur2 = list.find((b) => b.phase === "building") || list[0];
     const wait2 = list.filter((b) => b.phase === "queued");
-    return `\u5168\u505C ${names[cur2.kind]}${wait2.length ? " \xB7 \u6392\u968A " + tally(wait2) : ""}`;
+    const head = t("conPaused", { name: names[cur2.kind] });
+    return wait2.length ? `${head} · ${t("conQueue", { list: tally(wait2) })}` : head;
   }
   const cur = activeBuild(state, team);
   const wait = list.filter((b) => b.phase === "queued");
   const parts = [];
   if (cur) {
     const pct = Math.max(0, Math.round((1 - cur.buildLeft / cur.buildMax) * 100));
-    parts.push(`\u8208\u5EFA ${names[cur.kind]} ${pct}%`);
+    parts.push(t("conBuild", { name: names[cur.kind], pct }));
   }
-  if (wait.length) parts.push(`\u6392\u968A ${tally(wait)}`);
-  return parts.join(" \xB7 ");
+  if (wait.length) parts.push(t("conQueue", { list: tally(wait) }));
+  return parts.join(" · ");
 }
 function statusOf(u) {
-  if (u.piloting) return "\u84C4\u529B";
-  if (u.order.type === "gather") return u.carry >= CARRY ? "\u9001\u86CB\u7CD5" : "\u63A1\u96C6";
-  if (u.order.type === "attack") return "\u653B\u64CA";
-  if (u.order.type === "move") return "\u79FB\u52D5";
-  if (u.order.type === "pilot") return "\u99D5\u99DB";
-  if (u.order.type === "wait") return "\u7B49\u5019\u88DC\u8CA8";
-  return "\u5F85\u547D";
+  if (u.piloting) return t("stCharge");
+  if (u.order.type === "gather") return u.carry >= CARRY ? t("stDeliver") : t("stGather");
+  if (u.order.type === "attack") return t("stAttack");
+  if (u.order.type === "move") return t("stMove");
+  if (u.order.type === "pilot") return t("stPilot");
+  if (u.order.type === "wait") return t("stWait");
+  return t("stIdle");
 }
 function inspectCopy(state, sel) {
   if (!sel) return null;
@@ -1139,12 +1139,12 @@ function inspectCopy(state, sel) {
     if (!u) return null;
     const s = STATS[u.type];
     const actions = u.team === playerTeam(state) ? [
-      { id: "stop", label: "\u505C\u6B62", enabled: true },
-      ...u.type === "worker" ? [{ id: "autoJob", label: u.autoJob ? "\u53D6\u6D88\u81EA\u52D5\u63A1" : "\u81EA\u52D5\u63A1\u96C6", enabled: true }] : [{ id: "charge", label: "\u84C4\u529B\u5C04\u64CA", enabled: true }]
+      { id: "stop", label: t("stop"), enabled: true },
+      ...u.type === "worker" ? [{ id: "autoJob", label: u.autoJob ? t("autoJobOn") : t("autoJobOff"), enabled: true }] : [{ id: "charge", label: t("chargeShot"), enabled: true }]
     ] : [];
     return {
-      title: `${TEAM_NAME_ZH[u.team]} ${NAMES[u.type].zh}`,
-      sub: `${TEAM_NAME[u.team]} ${NAMES[u.type].en}`,
+      title: `${teamName(u.team)} ${locName(u.type)}`,
+      sub: `${otherTeamName(u.team)} ${otherLocName(u.type)}`,
       hp: Math.max(0, Math.ceil(u.hp)),
       maxHp: u.maxHp,
       atk: String(Math.round(s.dmg * feverMul(state))),
@@ -1161,19 +1161,19 @@ function inspectCopy(state, sel) {
     const mine = h.team === playerTeam(state);
     const trainP = h.queue ? 1 - h.queueT / h.queueMax : null;
     return {
-      title: `${TEAM_NAME_ZH[h.team]}\u72D7\u5C4B`,
-      sub: `${TEAM_NAME[h.team]} house`,
+      title: getLang() === "zh" ? `${teamName(h.team)}${locName("house")}` : `${teamName(h.team)} ${locName("house")}`,
+      sub: `${otherTeamName(h.team)} ${otherLocName("house")}`,
       hp: Math.max(0, Math.ceil(h.hp)),
       maxHp: h.maxHp,
       atk: String(Math.round(HOUSE_ATK.dmg * feverMul(state))),
-      status: h.queue ? `\u8A13\u7DF4 ${NAMES[h.queue].zh}` : "\u71DF\u5730",
+      status: h.queue ? t("stTrain", { name: locName(h.queue) }) : t("stCamp"),
       team: h.team,
       kind: "house",
       actions: mine ? [
-        { id: "worker", label: "\u8A13\u7DF4\u5DE5\u72D7", enabled: state.cake[playerTeam(state)] >= COSTS.worker && teamPop(state, 0) < POP_CAP && !h.queue },
-        { id: "rally", label: "\u8A2D\u96C6\u7D50\u9EDE", enabled: true }
+        { id: "worker", label: t("trainWorker"), enabled: state.cake[playerTeam(state)] >= COSTS.worker && teamPop(state, playerTeam(state)) < POP_CAP && !h.queue },
+        { id: "rally", label: t("setRally"), enabled: true }
       ] : [],
-      progress: trainP != null ? { label: "\u8A13\u7DF4", p: trainP } : null
+      progress: trainP != null ? { label: t("progressTrain"), p: trainP } : null
     };
   }
   if (sel.kind === "building") {
@@ -1184,51 +1184,51 @@ function inspectCopy(state, sel) {
     const trainP = !building && b.queue ? 1 - b.queueT / b.queueMax : null;
     const buildP = building ? 1 - b.buildLeft / b.buildMax : null;
     const actions = mine ? [
-      ...b.kind === "playground" && !building ? [{ id: "fighter", label: "訓練鬥士", enabled: state.cake[playerTeam(state)] >= COSTS.fighter && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
-      ...b.kind === "workshop" && !building ? [{ id: "car", label: "訓練騎士", enabled: state.cake[playerTeam(state)] >= COSTS.car && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
+      ...b.kind === "playground" && !building ? [{ id: "fighter", label: t("trainFighter"), enabled: state.cake[playerTeam(state)] >= COSTS.fighter && teamPop(state, playerTeam(state)) < POP_CAP && !b.queue }] : [],
+      ...b.kind === "workshop" && !building ? [{ id: "car", label: t("trainCar"), enabled: state.cake[playerTeam(state)] >= COSTS.car && teamPop(state, playerTeam(state)) < POP_CAP && !b.queue }] : [],
       ...b.kind === "tower" && !building ? [
-        { id: "focus", label: "指定目標", enabled: true },
-        { id: "autoFocus", label: "自動鎖定", enabled: b.focusId != null }
+        { id: "focus", label: t("focus"), enabled: true },
+        { id: "autoFocus", label: t("autoFocus"), enabled: b.focusId != null }
       ] : [],
-      { id: "rally", label: "\u8A2D\u96C6\u7D50\u9EDE", enabled: true }
+      { id: "rally", label: t("setRally"), enabled: true }
     ] : [];
     let towerStatus;
-    if (building) towerStatus = b.phase === "queued" ? "\u6392\u968A\u4E2D" : "\u5EFA\u9020\u4E2D";
-    else if (b.kind !== "tower") towerStatus = b.queue ? `\u8A13\u7DF4 ${NAMES[b.queue].zh}` : "\u5C31\u7DD2";
+    if (building) towerStatus = b.phase === "queued" ? t("stQueued") : t("stBuilding");
+    else if (b.kind !== "tower") towerStatus = b.queue ? t("stTrain", { name: locName(b.queue) }) : t("stReady");
     else if (b.focusId != null && b.focusKind) {
-      const t = lookupTarget(state, b.focusId, b.focusKind);
-      if (t && t.hp > 0) {
-        const label = b.focusKind === "unit" && t.type ? NAMES[t.type].zh : b.focusKind === "house" ? NAMES.house.zh : NAMES[t.kind].zh;
-        towerStatus = `鎖定 ${label}`;
-      } else towerStatus = "自動 · 最近單位";
-    } else towerStatus = "自動 · 最近單位";
+      const tgt = lookupTarget(state, b.focusId, b.focusKind);
+      if (tgt && tgt.hp > 0) {
+        const label = b.focusKind === "unit" && tgt.type ? locName(tgt.type) : b.focusKind === "house" ? locName("house") : locName(tgt.kind);
+        towerStatus = t("stLock", { name: label });
+      } else towerStatus = t("stAuto");
+    } else towerStatus = t("stAuto");
     return {
-      title: NAMES[b.kind].zh,
-      sub: NAMES[b.kind].en,
+      title: locName(b.kind),
+      sub: otherLocName(b.kind),
       hp: Math.max(0, Math.ceil(b.hp)),
       maxHp: b.maxHp,
-      atk: b.kind === "tower" ? String(Math.round(TOWER_ATK.dmg * feverMul(state))) : "\u2014",
+      atk: b.kind === "tower" ? String(Math.round(TOWER_ATK.dmg * feverMul(state))) : "—",
       status: towerStatus,
       team: b.team,
       kind: b.kind,
       actions,
-      progress: buildP != null ? { label: "\u8208\u5EFA", p: buildP } : trainP != null ? { label: "\u8A13\u7DF4", p: trainP } : null
+      progress: buildP != null ? { label: t("progressBuild"), p: buildP } : trainP != null ? { label: t("progressTrain"), p: trainP } : null
     };
   }
   if (sel.kind === "cake") {
     const n = state.cakes.find((x) => x.id === sel.id);
     if (!n) return null;
     return {
-      title: n.kind === "home" ? NAMES.home.zh : NAMES.well.zh,
-      sub: n.kind === "home" ? (n.stock <= 0.2 ? "空了 · 不再生" : "不再生 · food cart") : "緩慢回補 · cake shop",
+      title: n.kind === "home" ? locName("home") : locName("well"),
+      sub: n.kind === "home" ? (n.stock <= 0.2 ? t("cartEmpty") : t("cartLive")) : t("shopLive"),
       hp: Math.max(0, Math.ceil(n.stock)),
       maxHp: n.max,
-      atk: "\u2014",
-      status: n.stock <= 0.2 ? "\u7A7A\u4E86" : "\u53EF\u63A1\u96C6",
+      atk: "—",
+      status: n.stock <= 0.2 ? t("stEmpty") : t("stHarvest"),
       team: TEAM.MALTESE,
       kind: n.kind,
       actions: [],
-      progress: { label: "\u5EAB\u5B58", p: n.stock / n.max }
+      progress: { label: t("progressStock"), p: n.stock / n.max }
     };
   }
   return null;
@@ -1241,14 +1241,14 @@ function coachHint(state) {
   const play = hasReady(state, team, "playground");
   const idleW = workers.filter((w) => w.order.type === "idle" && !w.autoJob);
   if (idleW.length && workers.every((w) => w.order.type !== "gather") && state.t < 40) {
-    return "\u9078\u5DE5\u72D7\uFF0C\u518D\u9EDE\u9910\u8ECA\u63A1\u96C6";
+    return t("hintGather");
   }
-  if (!play && cake >= COSTS.playground && state.t > 8) return "\u9EDE\u904A\u6A02\u5834\uFF0C\u518D\u9EDE\u5730\u5716\u653E\u4F4D\u7F6E";
-  if (play && fighters.length === 0 && cake >= COSTS.fighter) return "健身房就緒 · 訓練鬥士出擊";
+  if (!play && cake >= COSTS.playground && state.t > 8) return t("hintPlay");
+  if (play && fighters.length === 0 && cake >= COSTS.fighter) return t("hintFighter");
   if (fighters.length >= 2 && fighters.every((f) => f.order.type === "idle") && state.t > 40) {
-    return "點選鬥士，再點對方狗屋進攻";
+    return t("hintAttack");
   }
-  if (state.fever) return "Fever！攻擊 ×2，兩邊狗屋每 15 秒扣 20 血";
+  if (state.fever) return t("hintFever");
   return "";
 }
 function commandSelected(state, ids, hit, p) {
