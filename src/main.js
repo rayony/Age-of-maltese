@@ -179,7 +179,7 @@ function startMatch(diff) {
   show(els.popChip, true);
   show(els.speedGroup, true);
   show(els.pauseBtn, true);
-  document.querySelectorAll("[data-speed]").forEach((b) => b.classList.toggle("on", b.dataset.speed === "1"));
+  document.getElementById("speedSelect").value = "1";
   document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === "units"));
   show(els.dockUnits, true);
   show(els.dockBuild, false);
@@ -427,7 +427,7 @@ canvas.addEventListener("pointerdown", (e) => {
   canvas.setPointerCapture(e.pointerId);
   const p = eventPos(e);
   const slop = Math.max(28, 26 / Math.max(0.2, view.scale));
-  const hit = pickAt(state, p.x, p.y, null, slop);
+  const hit = pickAt(state, p.x, p.y, playerTeam(state), slop, "select");
   hold = { t: performance.now(), p, hit, id: e.pointerId, moved: false };
 
   if (mode?.type === "place") {
@@ -498,14 +498,14 @@ canvas.addEventListener("pointerup", (e) => {
   }
   const p = eventPos(e);
   const slop = Math.max(28, 26 / Math.max(0.2, view.scale));
-  const hit = pickAt(state, p.x, p.y, null, slop);
+  const picked = pickAt(state, p.x, p.y, playerTeam(state), slop, sel.size ? "command" : "any");
   const ids = friendlyIds(state, [...sel]);
 
   if (mode?.type === "place") {
-    if (canPlace(state, p.x, p.y) && true) {
+    if (canPlace(state, p.x, p.y)) {
       issue(state, { kind: "build", team: playerTeam(state), what: mode.what, x: p.x, y: p.y });
+      setMode(null);
     }
-    setMode(null);
     marquee = null;
     return;
   }
@@ -531,8 +531,9 @@ canvas.addEventListener("pointerup", (e) => {
     return b;
   })();
   if (ownTower && !ids.length) {
-    if ((hit.kind === "unit" || hit.kind === "house" || hit.kind === "building") && hit.team !== playerTeam(state)) {
-      issue(state, { kind: "setTowerFocus", team: playerTeam(state), id: ownTower.id, target: hit.id, tKind: hit.kind });
+    const tap = h.moved ? picked : h.hit;
+    if ((tap.kind === "unit" || tap.kind === "house" || tap.kind === "building") && tap.team !== playerTeam(state)) {
+      issue(state, { kind: "setTowerFocus", team: playerTeam(state), id: ownTower.id, target: tap.id, tKind: tap.kind });
       setMode(null);
       marquee = null;
       return;
@@ -552,7 +553,8 @@ canvas.addEventListener("pointerup", (e) => {
   if (h.box && marquee) {
     const m = marquee;
     marquee = null;
-    if (h.moved) {
+    const boxSize = Math.hypot(m.x1 - m.x0, m.y1 - m.y0);
+    if (h.moved && boxSize >= 36) {
       const x0 = Math.min(m.x0, m.x1);
       const y0 = Math.min(m.y0, m.y1);
       const x1 = Math.max(m.x0, m.x1);
@@ -571,26 +573,26 @@ canvas.addEventListener("pointerup", (e) => {
     marquee = null;
   }
 
-  if (hit.kind === "unit" && hit.team === playerTeam(state) && !h.moved) {
+  const tap = h.moved ? picked : h.hit;
+  if (tap.kind === "unit" && tap.team === playerTeam(state) && !h.moved) {
     if (h.tapDeselect) {
       sel.clear();
       inspect = null;
       return;
     }
     sel.clear();
-    sel.add(hit.id);
-    inspect = { kind: "unit", id: hit.id };
+    sel.add(tap.id);
+    inspect = { kind: "unit", id: tap.id };
     return;
   }
 
   if (!ids.length) {
-    if (hit.kind === "house" || hit.kind === "building" || hit.kind === "cake") inspect = { kind: hit.kind, id: hit.id };
-    else if (hit.kind === "unit") inspect = { kind: "unit", id: hit.id };
+    if (tap.kind === "house" || tap.kind === "building" || tap.kind === "cake") inspect = { kind: tap.kind, id: tap.id };
+    else if (tap.kind === "unit") inspect = { kind: "unit", id: tap.id };
     return;
   }
 
-  commandSelected(state, ids, hit, p);
-  if (hit.kind === "house" || hit.kind === "building" || hit.kind === "cake") inspect = { kind: hit.kind, id: hit.id };
+  commandSelected(state, ids, tap, p);
 });
 
 canvas.addEventListener("pointercancel", (e) => {
@@ -680,11 +682,8 @@ document.getElementById("muteBtn").onclick = () => {
   if (!next) setTrack(screen === "play" ? "battle" : "title");
 };
 
-document.querySelectorAll("[data-speed]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    speed = Number(btn.dataset.speed);
-    document.querySelectorAll("[data-speed]").forEach((b) => b.classList.toggle("on", b === btn));
-  });
+document.getElementById("speedSelect")?.addEventListener("change", (e) => {
+  speed = Number(e.target.value) || 1;
 });
 document.querySelectorAll("[data-tab]").forEach((btn) => {
   btn.addEventListener("click", () => {

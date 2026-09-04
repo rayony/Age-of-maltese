@@ -1,4 +1,4 @@
-import { TEAM, COSTS, GOLD_COSTS, POP_CAP, MID_X } from "./config.js";
+import { TEAM, COSTS, GOLD_COSTS, POP_CAP, MID_X, ASSIST_RANGE } from "./config.js";
 import { dist, hasReady, issue, nearestStockedCake, playerTeam, teamPop } from "./sim.js";
 
 function enemyInMid(state) {
@@ -78,7 +78,7 @@ export function tickAI(state, dt) {
 
     if (a.order.type === "attack") continue;
 
-    if (threat) {
+    if (threat && dist(a, threat) <= ASSIST_RANGE) {
       issue(state, { kind: "attack", ids: [a.id], target: threat.id, tKind: "unit" });
       continue;
     }

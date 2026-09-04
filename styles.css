@@ -56,12 +56,16 @@ button:disabled { cursor: default; }
   border-radius: 999px;
   border: 2px solid rgba(255,246,220,0.2);
 }
-.speed button {
-  height: 36px; min-width: 36px;
-  border: 0; background: var(--ink-soft); color: rgba(255,246,220,0.7);
-  font-weight: 700; font-size: 12px;
+.speed select {
+  height: 36px; min-width: 4.2rem;
+  border: 0; background: var(--ink-soft); color: var(--cream);
+  font-weight: 700; font-size: 12px; padding: 0 10px;
+  cursor: pointer;
 }
-.speed button.on { background: var(--rose); color: var(--cream); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
 .icon-btn {
   width: 40px; height: 40px; border-radius: 999px;
   border: 1px solid rgba(255,246,220,0.15);
