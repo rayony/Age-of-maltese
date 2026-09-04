@@ -13,6 +13,7 @@ import {
   createState,
   hasReady,
   inspectCopy,
+  isMarqueeSelect,
   issue,
   friendlyIds,
   nextQueued,
@@ -424,11 +425,11 @@ canvas.addEventListener("pointerdown", (e) => {
     marquee = null;
     return;
   }
-  canvas.setPointerCapture(e.pointerId);
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic / already-released pointer */ }
   const p = eventPos(e);
   const slop = Math.max(28, 26 / Math.max(0.2, view.scale));
   const hit = pickAt(state, p.x, p.y, playerTeam(state), slop, "select");
-  hold = { t: performance.now(), p, hit, id: e.pointerId, moved: false };
+  hold = { t: performance.now(), p, screen: { x: e.clientX, y: e.clientY }, hit, id: e.pointerId, moved: false };
 
   if (mode?.type === "place") {
     ghost = { x: p.x, y: p.y, ok: canPlace(state, p.x, p.y) };
@@ -442,8 +443,6 @@ canvas.addEventListener("pointerdown", (e) => {
     } else if (!already) {
       sel.clear();
       sel.add(hit.id);
-    } else {
-      hold.tapDeselect = true;
     }
     inspect = { kind: "unit", id: hit.id };
     hold.dragUnit = true;
@@ -472,7 +471,8 @@ canvas.addEventListener("pointermove", (e) => {
   const p = eventPos(e);
   if (mode?.type === "place") ghost = { x: p.x, y: p.y, ok: canPlace(state, p.x, p.y) };
   if (!hold || hold.id !== e.pointerId) return;
-  if (Math.hypot(p.x - hold.p.x, p.y - hold.p.y) > 14) hold.moved = true;
+  const screenDist = Math.hypot(e.clientX - hold.screen.x, e.clientY - hold.screen.y);
+  if (screenDist > 18 || Math.hypot(p.x - hold.p.x, p.y - hold.p.y) > 22) hold.moved = true;
   if (hold.dragUnit && hold.moved && sel.size) {
     const now = performance.now();
     if (now - lastMoveCmd > 50) {
@@ -546,15 +546,18 @@ canvas.addEventListener("pointerup", (e) => {
     }
   }
   if (h.dragUnit && h.moved) {
-    issue(state, { kind: "move", ids, x: p.x, y: p.y });
-    marquee = null;
-    return;
+    const screenDist = Math.hypot(e.clientX - h.screen.x, e.clientY - h.screen.y);
+    if (screenDist >= 36) {
+      issue(state, { kind: "move", ids, x: p.x, y: p.y });
+      marquee = null;
+      return;
+    }
   }
   if (h.box && marquee) {
     const m = marquee;
     marquee = null;
-    const boxSize = Math.hypot(m.x1 - m.x0, m.y1 - m.y0);
-    if (h.moved && boxSize >= 36) {
+    const screenDist = Math.hypot(e.clientX - h.screen.x, e.clientY - h.screen.y);
+    if (h.moved && screenDist >= 36 && isMarqueeSelect(m.x0, m.y0, m.x1, m.y1)) {
       const x0 = Math.min(m.x0, m.x1);
       const y0 = Math.min(m.y0, m.y1);
       const x1 = Math.max(m.x0, m.x1);
@@ -573,26 +576,37 @@ canvas.addEventListener("pointerup", (e) => {
     marquee = null;
   }
 
-  const tap = h.moved ? picked : h.hit;
-  if (tap.kind === "unit" && tap.team === playerTeam(state) && !h.moved) {
-    if (h.tapDeselect) {
+  const tap = h.hit;
+  if (tap.kind === "unit" && tap.team === playerTeam(state)) {
+    if (!e.shiftKey) {
       sel.clear();
-      inspect = null;
-      return;
+      sel.add(tap.id);
     }
-    sel.clear();
-    sel.add(tap.id);
     inspect = { kind: "unit", id: tap.id };
     return;
   }
+  if (h.box) {
+    const again = pickAt(state, h.p.x, h.p.y, playerTeam(state), slop, "select");
+    if (again.kind === "unit" && again.team === playerTeam(state)) {
+      if (!e.shiftKey) sel.clear();
+      sel.add(again.id);
+      inspect = { kind: "unit", id: again.id };
+      sfx("select");
+      return;
+    }
+  }
 
-  if (!ids.length) {
-    if (tap.kind === "house" || tap.kind === "building" || tap.kind === "cake") inspect = { kind: tap.kind, id: tap.id };
-    else if (tap.kind === "unit") inspect = { kind: "unit", id: tap.id };
+  if (!h.moved) {
+    if (!ids.length) {
+      if (tap.kind === "house" || tap.kind === "building" || tap.kind === "cake") inspect = { kind: tap.kind, id: tap.id };
+      else if (tap.kind === "unit") inspect = { kind: "unit", id: tap.id };
+      return;
+    }
+    commandSelected(state, ids, tap, p);
     return;
   }
 
-  commandSelected(state, ids, tap, p);
+  commandSelected(state, ids, picked, p);
 });
 
 canvas.addEventListener("pointercancel", (e) => {

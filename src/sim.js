@@ -1073,6 +1073,11 @@ function step(state, dt, clockDt = dt) {
     }
   }
 }
+function isMarqueeSelect(x0, y0, x1, y1) {
+  const w = Math.abs(x1 - x0);
+  const h = Math.abs(y1 - y0);
+  return w >= 48 && h >= 40;
+}
 function pickAt(state, x, y, team, slop = 28, intent = "any") {
   const p = { x, y };
   const prefer = intent === "select" ? (team ?? playerTeam(state)) : null;
@@ -1336,6 +1341,7 @@ export {
   hasReady,
   housePos,
   inspectCopy,
+  isMarqueeSelect,
   issue,
   nearestCakeShop,
   nearestStockedCake,
