@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  BUILDING_HP,
   COSTS,
   FEVER_DMG,
+  GOLD_COSTS,
   GOLD_UNLOAD_CHANCE,
+  HEART_SPEED,
   HOME_STOCK,
   HOUSE_HP,
   MATCH_SECS,
@@ -11,6 +14,7 @@ import {
   START,
   STATS,
   TEAM,
+  TOWER_ATK,
   TRAIN,
   WELL_REGEN_CAP,
   WELL_STOCK,
@@ -326,5 +330,93 @@ describe("config issues", () => {
     }
     assert.equal(state.gold[TEAM.MALTESE], 1);
     assert.equal(worker.carry, 0);
+  });
+
+  it("tower does not fire when nothing is in range; hearts do not home", () => {
+    const state = createState("easy");
+    state.gold[TEAM.MALTESE] = 1;
+    issue(state, { kind: "build", team: TEAM.MALTESE, what: "tower", x: 900, y: 450 });
+    const tower = state.buildings.find((b) => b.kind === "tower" && b.team === TEAM.MALTESE);
+    tower.buildLeft = 0;
+    tower.phase = "done";
+    tower.atkCd = 0;
+    for (const u of state.units) {
+      if (u.team === TEAM.RETRIEVER) {
+        u.x = 80;
+        u.y = 80;
+      }
+    }
+    drain(state, 0.05);
+    assert.equal(state.hearts.filter((h) => h.ownerId === tower.id).length, 0);
+
+    const foe = state.units.find((u) => u.team === TEAM.RETRIEVER && u.type === "worker");
+    foe.x = tower.x - 160;
+    foe.y = tower.y;
+    foe.hp = 400;
+    foe.vx = 0;
+    foe.vy = 0;
+    tower.atkCd = 0;
+    drain(state, 0.05);
+    const shot = state.hearts.find((h) => h.ownerId === tower.id);
+    assert.ok(shot);
+    const vx = shot.vx;
+    const vy = shot.vy;
+    foe.y = tower.y + 160;
+    drain(state, 0.15);
+    const still = state.hearts.find((h) => h.id === shot.id);
+    assert.ok(still);
+    assert.equal(still.vx, vx);
+    assert.equal(still.vy, vy);
+    assert.ok(still.life < (TOWER_ATK.range + 56) / HEART_SPEED);
+  });
+
+  it("tower locked focus beats auto nearest unit", () => {
+    const state = createState("easy");
+    state.gold[TEAM.MALTESE] = 1;
+    issue(state, { kind: "build", team: TEAM.MALTESE, what: "tower", x: 900, y: 450 });
+    const tower = state.buildings.find((b) => b.kind === "tower" && b.team === TEAM.MALTESE);
+    tower.buildLeft = 0;
+    tower.phase = "done";
+    tower.atkCd = 0;
+    const foe = state.units.find((u) => u.team === TEAM.RETRIEVER && u.type === "worker");
+    foe.x = tower.x - 160;
+    foe.y = tower.y;
+    foe.hp = 400;
+    const hall = {
+      id: 9902,
+      kind: "playground",
+      team: TEAM.RETRIEVER,
+      x: tower.x - 90,
+      y: tower.y + 40,
+      r: 36,
+      hp: BUILDING_HP,
+      maxHp: BUILDING_HP,
+      buildLeft: 0,
+      buildMax: 1,
+      queue: null,
+      queueT: 0,
+      queueMax: 1,
+      phase: "done",
+      order: 1,
+      rally: { x: tower.x - 90, y: tower.y + 40 },
+      atkCd: 0,
+      hurt: 0,
+      focusId: null,
+      focusKind: null
+    };
+    state.buildings.push(hall);
+    issue(state, { kind: "setTowerFocus", team: TEAM.MALTESE, id: tower.id, target: hall.id, tKind: "building" });
+    assert.equal(tower.focusId, hall.id);
+    drain(state, 0.05);
+    const shot = state.hearts.find((h) => h.ownerId === tower.id);
+    assert.ok(shot);
+    const along = Math.hypot(shot.vx, shot.vy) || 1;
+    const toB = Math.hypot(hall.x - tower.x, hall.y - 4 - (tower.y - 18)) || 1;
+    const toU = Math.hypot(foe.x - tower.x, foe.y - 4 - (tower.y - 18)) || 1;
+    const alignB = (shot.vx / along) * ((hall.x - tower.x) / toB) + (shot.vy / along) * ((hall.y - 4 - (tower.y - 18)) / toB);
+    const alignU = (shot.vx / along) * ((foe.x - tower.x) / toU) + (shot.vy / along) * ((foe.y - 4 - (tower.y - 18)) / toU);
+    assert.ok(alignB > alignU);
+    assert.equal(GOLD_COSTS.tower, 1);
+    assert.equal(COSTS.tower, 0);
   });
 });
