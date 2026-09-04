@@ -24,7 +24,6 @@ Fan tribute work inspired by Maltese@moonlab 線條小狗 IP, not for commercial
 - Select a unit or building for a detail sidebar (HP stat, attack stat, status)
 - Map shows HP **bars only**, cake remain **bars only**, built progress **bars only**
 - After 5:00, **Fever Time**: both houses lose a fixed amount of HP every 15 seconds; attack power x2
-- Title + battle music, plus SFX (select / move / harvest / attack / fever / win / lose)
 
 ## Local
 
