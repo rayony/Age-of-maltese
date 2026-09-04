@@ -2,6 +2,7 @@ import { COSTS, MATCH_SECS, POP_CAP, TEAM } from "./config.js";
 import { tickAI } from "./ai.js";
 import { bootMuteFromStorage, isMuted, setMuted, setTrack, sfx, unlock } from "./audio.js";
 import { draw, drawPortrait, screenToWorld, viewFit } from "./render.js";
+import { loadSprites } from "./sprites.js";
 import {
   activeBuild,
   canPlace,
@@ -19,6 +20,8 @@ import {
   step,
   teamPop,
 } from "./sim.js";
+
+loadSprites();
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -212,7 +215,7 @@ function finish() {
   running = false;
   const win = state.winner === TEAM.MALTESE;
   els.endTitle.textContent = win ? "狗屋還在！" : "狗屋倒了";
-  els.endMsg.textContent = win ? "馬許把吐司的屋子砸到 0。" : "吐司先拆掉你的屋子。再練一局。";
+  els.endMsg.textContent = win ? "馬爾濟斯把尋回犬的屋子砸到 0。" : "尋回犬先拆掉你的屋子。再練一局。";
   show(els.end, true);
   setTrack("title");
 }
@@ -600,11 +603,11 @@ function loop(now) {
   if (!matchPaused) {
     acc += raw;
     while (acc >= DT) {
-      for (let i = 0; i < speed; i++) {
-        if (state.hitstop > 0) state.hitstop -= DT;
-        else {
+      if (state.hitstop > 0) state.hitstop -= DT;
+      else {
+        for (let i = 0; i < speed; i++) {
           if (running) tickAI(state, DT);
-          step(state, DT);
+          step(state, DT, i === 0 ? DT : 0);
         }
       }
       acc -= DT;

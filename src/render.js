@@ -1,4 +1,14 @@
 import { W, H, TEAM, TRAIN } from "./config.js";
+import {
+  buildingSpr,
+  cakeSpr,
+  carSpr,
+  drawSpr,
+  fighterFrame,
+  houseSpr,
+  scaffoldSpr,
+  workerFrame,
+} from "./sprites.js";
 function viewFit(cw, ch, cam) {
   const zoom = cam?.zoom ?? 1;
   const scale = Math.min(cw / W, ch / H) * zoom;
@@ -176,6 +186,15 @@ function drawCake(ctx, n) {
   ctx.save();
   ctx.translate(n.x, n.y);
   ellipseShadow(ctx, 0, 18, 28, 8, 0.16);
+  const img = cakeSpr(n.kind);
+  if (img) {
+    ctx.globalAlpha = empty ? 0.45 : 1;
+    drawSpr(ctx, img, 0, 22, n.kind === "home" ? 78 : 86, n.kind === "home" ? 78 : 86);
+    ctx.globalAlpha = 1;
+    hpBar(ctx, -22, 24, 44, lvl);
+    ctx.restore();
+    return;
+  }
   if (n.kind === "home") {
     ctx.fillStyle = "#6b5344";
     ctx.beginPath();
@@ -262,6 +281,14 @@ function drawHouse(ctx, h) {
     ctx.globalAlpha = 1;
   }
   ellipseShadow(ctx, 4, 36, 48, 12, 0.2);
+  const himg = houseSpr(h.team);
+  if (himg) {
+    drawSpr(ctx, himg, 4, 40, 118, 118);
+    hpBar(ctx, -36, 42, 72, h.hp / h.maxHp, h.hurt > 0);
+    if (h.queue) progressBar(ctx, -36, 50, 72, 1 - h.queueT / h.queueMax);
+    ctx.restore();
+    return;
+  }
   ctx.fillStyle = mal ? "#ead9b8" : "#c9a06a";
   round(ctx, -28, -10, 78, 48, 6);
   ctx.fill();
@@ -321,6 +348,17 @@ function drawBuilding(ctx, b) {
     ctx.fill();
   }
   ellipseShadow(ctx, 4, 28, 36, 10, 0.16);
+  const bimg = buildingSpr(b.kind);
+  if (bimg) {
+    const tall = b.kind === "tower" ? 92 : 84;
+    drawSpr(ctx, bimg, 2, 30, tall, tall);
+    if (b.buildLeft > 0) drawSpr(ctx, scaffoldSpr(), 2, 32, 88, 88);
+    hpBar(ctx, -32, 30, 64, b.hp / b.maxHp, b.hurt > 0);
+    if (b.buildLeft > 0) progressBar(ctx, -32, 38, 64, 1 - b.buildLeft / b.buildMax);
+    else if (b.queue) progressBar(ctx, -32, 38, 64, 1 - b.queueT / b.queueMax);
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle = "#2a2218";
   ctx.lineWidth = 3;
   if (b.kind === "playground") {
@@ -430,6 +468,16 @@ function drawRally(ctx, x, y, team) {
   ctx.stroke();
   ctx.restore();
 }
+function workerAction(u) {
+  if (u.order.type === "attack") return "battle";
+  if (u.order.type === "gather") {
+    const spd = Math.hypot(u.vx ?? 0, u.vy ?? 0);
+    if (u.carry > 0) return spd > 10 ? "carry" : "idle";
+    return spd > 10 ? "walk" : "harvest";
+  }
+  if (u.order.type === "move" || u.order.type === "pilot") return u.carry > 0 ? "carry" : "walk";
+  return u.carry > 0 ? "carry" : "idle";
+}
 function drawDog(ctx, u) {
   const mal = u.team === TEAM.MALTESE;
   const moving = u.order.type !== "idle" && u.order.type !== "gather" && u.order.type !== "wait" ? 1 : u.order.type === "gather" ? 0.6 : 0.15;
@@ -437,6 +485,21 @@ function drawDog(ctx, u) {
   const wag = Math.sin(u.bob * 10 + u.id) * (0.5 + moving * 0.4);
   ctx.save();
   ctx.translate(0, bob);
+  if (u.type === "fighter") {
+    const img = fighterFrame(u.team, u.bob, moving > 0.3);
+    if (img) {
+      drawSpr(ctx, img, 0, 16, 74, 74, u.facing < 0);
+      ctx.restore();
+      return;
+    }
+  } else {
+    const img = workerFrame(u.team, workerAction(u), u.bob);
+    if (img) {
+      drawSpr(ctx, img, 0, 16, 64, 64, u.facing < 0);
+      ctx.restore();
+      return;
+    }
+  }
   ctx.scale(u.facing >= 0 ? 1 : -1, 1);
   ctx.save();
   ctx.translate(-16, 4);
@@ -543,6 +606,12 @@ function drawCar(ctx, u) {
   const bob = Math.sin(u.bob * 14 + u.id) * 1.1;
   ctx.save();
   ctx.translate(0, bob);
+  const cimg = carSpr(u.team);
+  if (cimg) {
+    drawSpr(ctx, cimg, 0, 18, mal ? 96 : 90, mal ? 96 : 90, u.facing < 0);
+    ctx.restore();
+    return;
+  }
   ctx.scale(u.facing >= 0 ? 1 : -1, 1);
   if (mal) {
     ctx.fillStyle = "#2a2218";

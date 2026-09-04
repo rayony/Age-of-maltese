@@ -37,7 +37,7 @@
         <canvas id="game" width="1600" height="900"></canvas>
         <div class="float-hud">
           <div class="side-hp left">
-            <div class="name">Toast 吐司</div>
+            <div class="name">Retriever 尋回犬</div>
             <div class="hp"><i id="toastFill"></i></div>
           </div>
           <button id="clockBtn" class="timer" title="點兩下跳到 Fever 前 3 秒">
@@ -45,7 +45,7 @@
             <em id="clockLabel">Countdown</em>
           </button>
           <div class="side-hp right">
-            <div class="name" id="mallowName">Mallow 馬許</div>
+            <div class="name" id="mallowName">Maltese 馬爾濟斯</div>
             <div class="hp"><i id="mallowFill"></i></div>
           </div>
         </div>
@@ -71,7 +71,7 @@
         </aside>
         <div id="fever" class="fever hidden">
           <strong>FEVER</strong>
-          <span>攻擊 ×2 · 狗屋每 15 秒 −40</span>
+          <span>攻擊 ×2 · 狗屋每 15 秒 −20</span>
         </div>
       </div>
 
@@ -99,42 +99,24 @@
 
   <div id="title" class="overlay">
     <div class="card">
-      <p class="kicker">Mallow vs Toast</p>
+      <p class="kicker">Maltese vs Retriever</p>
       <h1>Age of Maltese</h1>
       <p class="slogan">Harvest, Build, Attack!</p>
       <p class="fine-title">心心狗屋</p>
       <div class="marks">
         <div class="mark">
-          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
-            <ellipse cx="32" cy="56" rx="16" ry="5" fill="#2a2218" opacity="0.16"/>
-            <circle cx="32" cy="30" r="18" fill="#fffdf8" stroke="#2a2218" stroke-width="3"/>
-            <ellipse cx="18" cy="16" rx="7" ry="10" fill="#f4c4ce" stroke="#2a2218" stroke-width="2.5" transform="rotate(-18 18 16)"/>
-            <ellipse cx="46" cy="16" rx="7" ry="10" fill="#f4c4ce" stroke="#2a2218" stroke-width="2.5" transform="rotate(18 46 16)"/>
-            <circle cx="26" cy="28" r="2" fill="#2a2218"/><circle cx="38" cy="28" r="2" fill="#2a2218"/>
-            <ellipse cx="32" cy="33" rx="1.8" ry="1.3" fill="#2a2218"/>
-            <path d="M28 37c2 3 6 3 8 0" fill="none" stroke="#2a2218" stroke-width="1.8" stroke-linecap="round"/>
-            <rect x="20" y="44" width="24" height="8" rx="4" fill="#e07a8a" stroke="#2a2218" stroke-width="2"/>
-          </svg>
-          <span>Mallow</span>
+          <img src="sprites/maltese/worker-idle-0.png" width="64" height="64" alt="Maltese" />
+          <span>Maltese</span>
         </div>
         <svg class="heart-mark" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
           <path d="M14 24C14 24 4 17 4 11.5 4 8 6.8 6 9.5 6 11.4 6 13 7.2 14 9c1-1.8 2.6-3 4.5-3C21.2 6 24 8 24 11.5 24 17 14 24 14 24Z" fill="#e07a8a" stroke="#2a2218" stroke-width="2"/>
         </svg>
         <div class="mark">
-          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
-            <ellipse cx="32" cy="56" rx="16" ry="5" fill="#2a2218" opacity="0.16"/>
-            <circle cx="32" cy="30" r="18" fill="#e0b07a" stroke="#2a2218" stroke-width="3"/>
-            <ellipse cx="18" cy="16" rx="7" ry="10" fill="#c48a52" stroke="#2a2218" stroke-width="2.5" transform="rotate(-18 18 16)"/>
-            <ellipse cx="46" cy="16" rx="7" ry="10" fill="#c48a52" stroke="#2a2218" stroke-width="2.5" transform="rotate(18 46 16)"/>
-            <circle cx="26" cy="28" r="2" fill="#2a2218"/><circle cx="38" cy="28" r="2" fill="#2a2218"/>
-            <ellipse cx="32" cy="33" rx="1.8" ry="1.3" fill="#2a2218"/>
-            <path d="M28 37c2 3 6 3 8 0" fill="none" stroke="#2a2218" stroke-width="1.8" stroke-linecap="round"/>
-            <rect x="20" y="44" width="24" height="8" rx="4" fill="#4d8f5a" stroke="#2a2218" stroke-width="2"/>
-          </svg>
-          <span>Toast</span>
+          <img src="sprites/retriever/worker-idle-0.png" width="64" height="64" alt="Retriever" />
+          <span>Retriever</span>
         </div>
       </div>
-      <p>原創白毛小隊對金毛小隊。採蛋糕、蓋塔、訓練鬥狗。馬許開紅跑車，吐司騎電單車，用粉紅愛心把對面狗屋打到零。</p>
+      <p>原創馬爾濟斯小隊對尋回犬小隊。採蛋糕、蓋塔、訓練鬥狗。馬爾濟斯開紅跑車，尋回犬騎電單車，用粉紅愛心把對面狗屋打到零。</p>
       <div class="row">
         <button id="easy">vs AI 簡單</button>
         <button id="hard" class="ink">vs AI 困難</button>
@@ -174,7 +156,7 @@
         <li>側欄可設集結點；新生單位會走過去。</li>
         <li>暫停整場（Paused），興建另有全停／插隊。</li>
         <li>頂部 1x / 2x / 4x。滾輪或捏合縮放。點倒數兩下跳 Fever。</li>
-        <li>三分鐘後 Fever：攻擊 ×2，狗屋每 15 秒扣 40。</li>
+        <li>三分鐘後 Fever：攻擊 ×2，狗屋每 15 秒扣 20。1x/2x/4x 只加速單位與興建，倒數維持真實時間。</li>
       </ol>
       <p class="fine">家側餐車不回補；中線蛋糕店會緩慢回補。愛心不會誤傷隊友。</p>
       <button id="helpOk" class="ink wide">知道了</button>

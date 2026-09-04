@@ -751,14 +751,14 @@ function skipToFever(state) {
   if (state.t >= MATCH_SECS - 3) return;
   state.t = MATCH_SECS - 3;
 }
-function step(state, dt) {
+function step(state, dt, clockDt = dt) {
   if (state.winner) return;
-  if (!state.preview) state.t += dt;
-  state.feverFlash = Math.max(0, state.feverFlash - dt);
-  state.trauma = Math.max(0, state.trauma - dt * 1.6);
-  state.houseWarn[0] = Math.max(0, state.houseWarn[0] - dt);
-  state.houseWarn[1] = Math.max(0, state.houseWarn[1] - dt);
-  state.unitWarn = Math.max(0, state.unitWarn - dt);
+  if (!state.preview) state.t += clockDt;
+  state.feverFlash = Math.max(0, state.feverFlash - clockDt);
+  state.trauma = Math.max(0, state.trauma - clockDt * 1.6);
+  state.houseWarn[0] = Math.max(0, state.houseWarn[0] - clockDt);
+  state.houseWarn[1] = Math.max(0, state.houseWarn[1] - clockDt);
+  state.unitWarn = Math.max(0, state.unitWarn - clockDt);
   for (const n of state.cakes) {
     if (n.kind === "well" && n.stock < WELL_REGEN_CAP) {
       n.stock = Math.min(WELL_REGEN_CAP, n.stock + WELL_REGEN * dt);
@@ -828,7 +828,7 @@ function step(state, dt) {
       state.events.push("fever");
       state.trauma = 0.7;
     }
-    state.feverAcc += dt;
+    state.feverAcc += clockDt;
     while (state.feverAcc >= FEVER_EVERY) {
       state.feverAcc -= FEVER_EVERY;
       for (const h of state.houses) {
@@ -1018,7 +1018,7 @@ function coachHint(state) {
   if (fighters.length >= 2 && fighters.every((f) => f.order.type === "idle") && state.t > 40) {
     return "\u9EDE\u9078\u9B25\u72D7\uFF0C\u518D\u9EDE\u5C0D\u65B9\u72D7\u5C4B\u9032\u653B";
   }
-  if (state.fever) return "Fever\uFF01\u653B\u64CA \xD72\uFF0C\u5169\u908A\u72D7\u5C4B\u6BCF 15 \u79D2\u6263 40 \u8840";
+  if (state.fever) return "Fever！攻擊 ×2，兩邊狗屋每 15 秒扣 20 血";
   return "";
 }
 function commandSelected(state, ids, hit, p) {

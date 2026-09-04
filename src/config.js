@@ -7,13 +7,13 @@ export const MATCH_SECS = 180;
 export const TEAM = { MALTESE: 0, RETRIEVER: 1 };
 
 export const TEAM_NAME = {
-  0: "Mallow",
-  1: "Toast",
+  0: "Maltese",
+  1: "Retriever",
 };
 
 export const TEAM_NAME_ZH = {
-  0: "馬許",
-  1: "吐司",
+  0: "馬爾濟斯",
+  1: "尋回犬",
 };
 
 export const COSTS = {
@@ -44,7 +44,7 @@ export const HOUSE_HP = 400;
 export const BUILDING_HP = 180;
 export const TOWER_HP = 160;
 export const FEVER_EVERY = 15;
-export const FEVER_DMG = 40;
+export const FEVER_DMG = 20;
 export const FEVER_ATK = 2;
 export const CARRY = 10;
 

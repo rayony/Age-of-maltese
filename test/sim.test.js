@@ -197,4 +197,15 @@ describe("fever", () => {
       assert.equal(state.houses[i].hp, hpAfterStart[i] - FEVER_DMG);
     }
   });
+
+  it("clockDt 0 moves units without advancing the match clock", () => {
+    const state = createState("easy");
+    const worker = state.units.find((u) => u.team === TEAM.MALTESE && u.type === "worker");
+    const t0 = state.t;
+    const x0 = worker.x;
+    issue(state, { kind: "move", ids: [worker.id], x: worker.x - 240, y: worker.y });
+    for (let i = 0; i < 30; i++) step(state, 1 / 30, 0);
+    assert.equal(state.t, t0);
+    assert.ok(worker.x < x0 - 10);
+  });
 });

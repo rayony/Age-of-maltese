@@ -16,7 +16,7 @@ function drain(state, seconds) {
 }
 
 describe("AI", () => {
-  it("easy Toast trains a second worker and starts a playground", () => {
+  it("easy Retriever trains a second worker and starts a playground", () => {
     const state = createState("easy");
     state.cake[TEAM.RETRIEVER] = 200;
     drain(state, 1);
