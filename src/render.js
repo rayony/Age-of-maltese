@@ -351,7 +351,25 @@ function drawHouse(ctx, h) {
   if (h.queue) progressBar(ctx, -36, 50, 72, 1 - h.queueT / h.queueMax);
   ctx.restore();
 }
-function drawBuilding(ctx, b) {
+function drawPrimaryStar(ctx) {
+  ctx.save();
+  ctx.translate(0, -46);
+  ctx.fillStyle = "#f4d35e";
+  ctx.strokeStyle = "#2a2218";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI * 2) / 5;
+    const a2 = a + Math.PI / 5;
+    ctx.lineTo(Math.cos(a) * 9, Math.sin(a) * 9);
+    ctx.lineTo(Math.cos(a2) * 3.6, Math.sin(a2) * 3.6);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+function drawBuilding(ctx, b, primary = false) {
   ctx.save();
   ctx.translate(b.x, b.y);
   ctx.globalAlpha = b.buildLeft > 0 ? b.phase === "queued" ? 0.42 : 0.75 : 1;
@@ -367,6 +385,7 @@ function drawBuilding(ctx, b) {
     const tall = b.kind === "tower" ? 92 : 84;
     drawSpr(ctx, bimg, 2, 30, tall, tall);
     if (b.buildLeft > 0) drawSpr(ctx, scaffoldSpr(), 2, 32, 88, 88);
+    if (primary && b.buildLeft <= 0) drawPrimaryStar(ctx);
     hpBar(ctx, -32, 30, 64, b.hp / b.maxHp, b.hurt > 0);
     if (b.buildLeft > 0) progressBar(ctx, -32, 38, 64, 1 - b.buildLeft / b.buildMax);
     else if (b.queue) progressBar(ctx, -32, 38, 64, 1 - b.queueT / b.queueMax);
@@ -460,6 +479,7 @@ function drawBuilding(ctx, b) {
   } else {
     hpBar(ctx, -32, 30, 64, b.hp / b.maxHp, b.hurt > 0);
     if (b.queue) progressBar(ctx, -32, 38, 64, 1 - b.queueT / b.queueMax);
+    if (primary) drawPrimaryStar(ctx);
   }
   ctx.restore();
 }
@@ -802,7 +822,7 @@ function draw(ctx, state, sel, inspectId, view, marquee, extras) {
     drawHouse(ctx, h);
     if (extras?.showRallyOf && extras.showRallyOf.x === h.rally.x) drawRally(ctx, h.rally.x, h.rally.y, h.team);
   }
-  for (const b of state.buildings) drawBuilding(ctx, b);
+  for (const b of state.buildings) drawBuilding(ctx, b, state.primary?.[b.team]?.[b.kind] === b.id);
   if (extras?.showRallyOf) drawRally(ctx, extras.showRallyOf.x, extras.showRallyOf.y, extras.showRallyOf.team);
   for (const m of state.markers) drawMarker(ctx, m);
   const units = [...state.units].sort((a, b) => a.y - b.y);

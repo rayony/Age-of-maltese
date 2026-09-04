@@ -1,5 +1,5 @@
 import { TEAM, COSTS, GOLD_COSTS, POP_CAP, MID_X } from "./config.js";
-import { dist, hasReady, issue, nearestStockedCake, playerTeam, teamPop } from "./sim.js";
+import { dist, hasReady, issue, nearestStockedCake, playerTeam, teamPop, trainCost } from "./sim.js";
 
 function enemyInMid(state) {
   const me = playerTeam(state);
@@ -35,17 +35,17 @@ export function tickAI(state, dt) {
   const easyCap = !hard && pop >= playerPop + 1;
 
   if (!easyCap) {
-    if (workers.length < (hard ? 3 : 2) && cake >= COSTS.worker && pop < POP_CAP) {
+    if (workers.length < (hard ? 3 : 2) && cake >= trainCost(state, team, "worker") && pop < POP_CAP) {
       issue(state, { kind: "trainWorker", team });
     } else if (!hasPlay && cake >= COSTS.playground) {
       issue(state, { kind: "build", team, what: "playground" });
-    } else if (playReady && cake >= COSTS.fighter && pop < POP_CAP) {
+    } else if (playReady && cake >= trainCost(state, team, "fighter") && pop < POP_CAP) {
       issue(state, { kind: "trainFighter", team });
     } else if (hard && playReady && !hasTower && gold >= (GOLD_COSTS.tower || 0)) {
       issue(state, { kind: "build", team, what: "tower" });
     } else if (hard && hasPlay && !hasShop && cake >= COSTS.workshop && workers.length >= 3) {
       issue(state, { kind: "build", team, what: "workshop" });
-    } else if (hard && shopReady && cake >= COSTS.car && pop < POP_CAP) {
+    } else if (hard && shopReady && cake >= trainCost(state, team, "car") && pop < POP_CAP) {
       issue(state, { kind: "trainCar", team });
     }
   }
