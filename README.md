@@ -9,6 +9,9 @@ Inspired by the *feel* of line-drawn puppy games (including Maltese Snowwar), bu
 **Play:** [rayony.github.io/Age-of-maltese](https://rayony.github.io/Age-of-maltese/)  
 Fallback: open `index.html` over HTTP (`npx serve .`).
 
+[![CI](https://github.com/rayony/Age-of-maltese/actions/workflows/ci.yml/badge.svg)](https://github.com/rayony/Age-of-maltese/actions/workflows/ci.yml)
+[![Pages](https://github.com/rayony/Age-of-maltese/actions/workflows/pages.yml/badge.svg)](https://github.com/rayony/Age-of-maltese/actions/workflows/pages.yml)
+
 ## Prototype
 
 - vs AI (Easy / Hard); you play Mallow
@@ -35,8 +38,11 @@ Not in this build: PvP rooms, bank notes / burgers, Cooking School techs.
 ```bash
 git clone https://github.com/rayony/Age-of-maltese.git
 cd Age-of-maltese
+npm test
 npx --yes serve -p 8080 .
 ```
+
+PRs run **CI** (syntax + unit tests). Merges to `main` run the same tests, then deploy GitHub Pages.
 
 ## License
 
