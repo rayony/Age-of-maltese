@@ -1,6 +1,8 @@
 # Age of Maltese
 
-<img width="1888" height="1044" alt="banner" src="https://github.com/user-attachments/assets/5eefb7fc-edae-4eda-b21e-65219d102c3e" />
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/5eefb7fc-edae-4eda-b21e-65219d102c3e" alt="Age of Maltese — banner" width="640">
+</p>
 
 A browser-based, fast-paced RTS game in five minutes: Command the Maltese (white dog characters) against the Retriever (golden dog characters). Gather cake, train fighters or a rider, and knock the other dog's house to zero with hearts.
 
