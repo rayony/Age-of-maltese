@@ -626,19 +626,19 @@ document.getElementById("clockBtn").onclick = () => {
   if (now - lastClock < 420) skipToFever(state);
   lastClock = now;
 };
-document.getElementById("cakeChip").onclick = () => {
+document.getElementById("cakeChip").onclick = (e) => {
   if (screen !== "play") return;
   const now = performance.now();
-  if (now - lastCake < 420) {
+  if (e.detail >= 2 || now - lastCake < 420) {
     issue(state, { kind: "cheatCake", team: playerTeam(state) });
     hud();
   }
   lastCake = now;
 };
-document.getElementById("goldChip").onclick = () => {
+document.getElementById("goldChip").onclick = (e) => {
   if (screen !== "play") return;
   const now = performance.now();
-  if (now - lastGold < 420) {
+  if (e.detail >= 2 || now - lastGold < 420) {
     issue(state, { kind: "cheatGold", team: playerTeam(state) });
     hud();
   }
