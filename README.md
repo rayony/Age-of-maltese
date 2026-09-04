@@ -8,17 +8,20 @@ Fan tribute work inspired by Maltese@moonlab 線條小狗 IP, not for commercial
 
 **Play:** [maltese-rts.grok.me](https://maltese-rts.grok.me/)  
 
-## Prototype
+## Rules
 
 - vs AI (Easy / Hard); you play Maltese
+- Game ends when the doghouse of either side has no more HP (0)
 - Cake-only economy; home carts do not regen; cake shops in the middle do
-- Workers only harvest cake
-- Construct one building at a time; extra buildings queue if you can pay now
+- Workers only harvest cake, and more workers can be trained by consuming cake
+- Fighter and Rider require a prerequisite to train (at least one playground/workshop), stronger than workers but don't harvest
+- Construct a maximum of one building and one unit at a time; extra buildings/unit queue if you can pay now
+- Extra playground/workshop shortens the time and cake required to train a unit
 - Population cap at 10 units for each team (workers + fighters + riders)
 - Instant death — retrain if a dog drops
 - Select a unit or building for a detail sidebar (HP stat, attack stat, status)
-- Map shows HP **bars only**
-- After 5:00, **Fever Time**: both houses lose a fixed HP every 15 seconds, attack power x2
+- Map shows HP **bars only**, cake remain **bars only**, built progress **bars only**
+- After 5:00, **Fever Time**: both houses lose a fixed amount of HP every 15 seconds; attack power x2
 - Title + battle music, plus SFX (select / move / harvest / attack / fever / win / lose)
 
 ## Local
