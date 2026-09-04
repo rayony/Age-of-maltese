@@ -1,4 +1,5 @@
-import { COSTS, MATCH_SECS, POP_CAP, TEAM } from "./config.js";
+import { COSTS, GOLD_COSTS, MATCH_SECS, NAMES, POP_CAP, TEAM, TEAM_NAME, TEAM_NAME_ZH } from "./config.js";
+import { t, getLang, setLang, teamLabel } from "./i18n.js";
 import { tickAI } from "./ai.js";
 import { bootMuteFromStorage, isMuted, setMuted, setTrack, sfx, unlock } from "./audio.js";
 import { draw, drawPortrait, screenToWorld, viewFit, clampPan } from "./render.js";
@@ -20,6 +21,7 @@ import {
   skipToFever,
   step,
   teamPop,
+  playerTeam,
 } from "./sim.js";
 
 loadSprites();
@@ -36,6 +38,8 @@ const els = {
   cakeChip: document.getElementById("cakeChip"),
   popChip: document.getElementById("popChip"),
   cakeNum: document.getElementById("cakeNum"),
+  goldChip: document.getElementById("goldChip"),
+  goldNum: document.getElementById("goldNum"),
   popNum: document.getElementById("popNum"),
   speedGroup: document.getElementById("speedGroup"),
   pauseBtn: document.getElementById("pauseBtn"),
@@ -65,7 +69,9 @@ const els = {
   endMsg: document.getElementById("endMsg"),
 };
 
-let state = createState("easy", true);
+let pickSide = TEAM.MALTESE;
+let lastCake = 0;
+let state = createState("easy", true, pickSide);
 const sel = new Set();
 let inspect = null;
 let view = viewFit(1, 1);
@@ -149,10 +155,11 @@ function eventPos(e) {
 }
 
 function startMatch(diff) {
+  const side = pickSide;
   unlock();
   sfx("select");
   setTrack("battle");
-  state = createState(diff, false);
+  state = createState(diff, false, side);
   sel.clear();
   inspect = null;
   running = true;
@@ -168,6 +175,7 @@ function startMatch(diff) {
   show(els.end, false);
   show(els.paused, false);
   show(els.cakeChip, true);
+  if (els.goldChip) show(els.goldChip, true);
   show(els.popChip, true);
   show(els.speedGroup, true);
   show(els.pauseBtn, true);
@@ -181,7 +189,7 @@ function startMatch(diff) {
 function backToTitle() {
   unlock();
   setTrack("title");
-  state = createState("easy", true);
+  state = createState("easy", true, pickSide);
   sel.clear();
   inspect = null;
   running = false;
@@ -192,6 +200,7 @@ function backToTitle() {
   show(els.end, false);
   show(els.paused, false);
   show(els.cakeChip, false);
+  if (els.goldChip) show(els.goldChip, false);
   show(els.popChip, false);
   show(els.speedGroup, false);
   show(els.pauseBtn, false);
@@ -206,9 +215,10 @@ function togglePause() {
 
 function finish() {
   running = false;
-  const win = state.winner === TEAM.MALTESE;
-  els.endTitle.textContent = win ? "狗屋還在！" : "狗屋倒了";
-  els.endMsg.textContent = win ? "馬爾濟斯把尋回犬的屋子砸到 0。" : "尋回犬先拆掉你的屋子。再練一局。";
+  const win = state.winner === playerTeam(state);
+  const asR = playerTeam(state) === TEAM.RETRIEVER;
+  els.endTitle.textContent = win ? t("winTitle") : t("loseTitle");
+  els.endMsg.textContent = win ? (asR ? t("winMsgR") : t("winMsg")) : (asR ? t("loseMsgR") : t("loseMsg"));
   show(els.end, true);
   setTrack("title");
 }
@@ -228,7 +238,7 @@ function setDockBtn(act, { disabled, vivid, active, label }) {
 }
 
 function hud() {
-  const team = TEAM.MALTESE;
+  const team = playerTeam(state);
   const cake = Math.floor(state.cake[team]);
   const pop = teamPop(state, team);
   const play = hasReady(state, team, "playground");
@@ -240,6 +250,7 @@ function hud() {
   const info = inspectCopy(state, inspect);
 
   els.cakeNum.textContent = String(cake);
+  if (els.goldNum) els.goldNum.textContent = String(state.gold[team] || 0);
   els.popNum.textContent = `${pop}/${POP_CAP}`;
   els.clock.textContent = clock;
   els.clockLabel.textContent = label;
@@ -249,7 +260,13 @@ function hud() {
   els.toastFill.style.background = tP > 0.35 ? "var(--hp)" : "var(--roof)";
   els.mallowFill.style.width = `${mP * 100}%`;
   els.mallowFill.style.background = mP > 0.35 ? "var(--hp)" : "var(--roof)";
-  document.querySelector(".side-hp.right").classList.toggle("warn", state.houseWarn[0] > 0);
+  const maltese = state.houses.find((h) => h.team === TEAM.MALTESE);
+  const retriever = state.houses.find((h) => h.team === TEAM.RETRIEVER);
+  document.querySelector(".side-hp.right .name").textContent = teamLabel(0, TEAM_NAME_ZH[0], TEAM_NAME[0]);
+  document.querySelector(".side-hp.left .name").textContent = teamLabel(1, TEAM_NAME_ZH[1], TEAM_NAME[1]);
+  document.querySelector(".side-hp.right").classList.toggle("warn", (state.houseWarn[TEAM.MALTESE] || 0) > 0);
+  document.querySelector(".side-hp.left").classList.toggle("warn", (state.houseWarn[TEAM.RETRIEVER] || 0) > 0);
+
 
   const con = constructionHint(state, team);
   const hint = coachHint(state);
@@ -276,27 +293,32 @@ function hud() {
   els.banner.className = bannerClass + (banner ? "" : " hidden");
   show(els.fever, state.feverFlash > 0);
 
-  setDockBtn("worker", { disabled: cake < COSTS.worker || pop >= POP_CAP, vivid: cake >= COSTS.worker && pop < POP_CAP, label: `工狗 ${COSTS.worker}` });
-  setDockBtn("fighter", { disabled: cake < COSTS.fighter || !play || pop >= POP_CAP, vivid: cake >= COSTS.fighter && play && pop < POP_CAP, label: `鬥士 ${COSTS.fighter}` });
-  setDockBtn("car", { disabled: cake < COSTS.car || !shop || pop >= POP_CAP, vivid: cake >= COSTS.car && shop && pop < POP_CAP, label: `騎士 ${COSTS.car}` });
+  const gold = state.gold[team] || 0;
+  const waitN = (state.waitTrain[team] || []).length;
+  setDockBtn("worker", { disabled: pop >= POP_CAP && waitN >= 5, vivid: cake >= COSTS.worker && pop < POP_CAP, label: `${NAMES.worker.zh} ${COSTS.worker}` });
+  setDockBtn("fighter", { disabled: !play, vivid: cake >= COSTS.fighter && play && pop < POP_CAP, label: `${NAMES.fighter.zh} ${COSTS.fighter}` });
+  setDockBtn("car", { disabled: !shop, vivid: cake >= COSTS.car && shop && pop < POP_CAP, label: `${NAMES.car.zh} ${COSTS.car}` });
   setDockBtn("playground", {
-    disabled: cake < COSTS.playground,
+    disabled: false,
     vivid: cake >= COSTS.playground,
     active: mode?.type === "place" && mode.what === "playground",
-    label: `${qLabel("playground", "遊樂場")} ${COSTS.playground}`,
+    label: `${qLabel("playground", NAMES.playground.zh)} ${COSTS.playground}`,
   });
   setDockBtn("workshop", {
-    disabled: cake < COSTS.workshop,
+    disabled: false,
     vivid: cake >= COSTS.workshop,
     active: mode?.type === "place" && mode.what === "workshop",
-    label: `${qLabel("workshop", "工坊")} ${COSTS.workshop}`,
+    label: `${qLabel("workshop", NAMES.workshop.zh)} ${COSTS.workshop}`,
   });
   setDockBtn("tower", {
-    disabled: cake < COSTS.tower,
-    vivid: cake >= COSTS.tower,
+    disabled: false,
+    vivid: gold >= (GOLD_COSTS.tower || 0),
     active: mode?.type === "place" && mode.what === "tower",
-    label: `${qLabel("tower", "心心塔")} ${COSTS.tower}`,
+    label: `${qLabel("tower", NAMES.tower.zh)} ${GOLD_COSTS.tower}幣`,
   });
+  setDockBtn("stanceHarvest", { active: state.stance[team] === "harvest" });
+  setDockBtn("stanceAttack", { active: state.stance[team] === "attack" });
+  setDockBtn("stanceDefend", { active: state.stance[team] === "defend" });
   setDockBtn("pauseBuild", {
     disabled: !site,
     label: state.buildPaused[team] ? "續建" : "全停",
@@ -336,7 +358,7 @@ function hud() {
 function act(kind) {
   if (!state || state.winner || !running) return;
   const ids = friendlyIds(state, [...sel]);
-  const team = TEAM.MALTESE;
+  const team = playerTeam(state);
   if (kind === "worker") issue(state, { kind: "trainWorker", team });
   if (kind === "fighter") issue(state, { kind: "trainFighter", team });
   if (kind === "car") issue(state, { kind: "trainCar", team });
@@ -365,6 +387,14 @@ function act(kind) {
       u.charge = 1;
       setMode({ type: "charge" });
     }
+  }
+  if (kind === "stanceHarvest") issue(state, { kind: "stance", team, stance: "harvest" });
+  if (kind === "stanceAttack") issue(state, { kind: "stance", team, stance: "attack" });
+  if (kind === "stanceDefend") issue(state, { kind: "stance", team, stance: "defend" });
+  if (kind === "clearSel") {
+    sel.clear();
+    inspect = null;
+    hud();
   }
 }
 
@@ -395,7 +425,7 @@ canvas.addEventListener("pointerdown", (e) => {
     ghost = { x: p.x, y: p.y, ok: canPlace(state, p.x, p.y) };
     return;
   }
-  if (hit.kind === "unit" && hit.team === TEAM.MALTESE) {
+  if (hit.kind === "unit" && hit.team === playerTeam(state)) {
     const already = sel.has(hit.id);
     if (e.shiftKey) {
       if (already) sel.delete(hit.id);
@@ -463,8 +493,8 @@ canvas.addEventListener("pointerup", (e) => {
   const ids = friendlyIds(state, [...sel]);
 
   if (mode?.type === "place") {
-    if (canPlace(state, p.x, p.y) && state.cake[0] >= COSTS[mode.what]) {
-      issue(state, { kind: "build", team: TEAM.MALTESE, what: mode.what, x: p.x, y: p.y });
+    if (canPlace(state, p.x, p.y) && true) {
+      issue(state, { kind: "build", team: playerTeam(state), what: mode.what, x: p.x, y: p.y });
     }
     setMode(null);
     marquee = null;
@@ -479,7 +509,7 @@ canvas.addEventListener("pointerup", (e) => {
     return;
   }
   if (mode?.type === "charge" && ids[0] != null) {
-    const u = state.units.find((x) => x.id === ids[0] && x.team === TEAM.MALTESE);
+    const u = state.units.find((x) => x.id === ids[0] && x.team === playerTeam(state));
     if (u) issue(state, { kind: "pilotShoot", id: u.id, x: p.x, y: p.y, charge: 1 });
     setMode(null);
     marquee = null;
@@ -500,7 +530,7 @@ canvas.addEventListener("pointerup", (e) => {
       const y1 = Math.max(m.y0, m.y1);
       if (!e.shiftKey) sel.clear();
       for (const u of state.units) {
-        if (u.team !== TEAM.MALTESE) continue;
+        if (u.team !== playerTeam(state)) continue;
         if (u.x >= x0 && u.x <= x1 && u.y >= y0 && u.y <= y1) sel.add(u.id);
       }
       const first = [...sel][0];
@@ -512,7 +542,7 @@ canvas.addEventListener("pointerup", (e) => {
     marquee = null;
   }
 
-  if (hit.kind === "unit" && hit.team === TEAM.MALTESE && !h.moved) {
+  if (hit.kind === "unit" && hit.team === playerTeam(state) && !h.moved) {
     if (h.tapDeselect) {
       sel.clear();
       inspect = null;
@@ -566,6 +596,53 @@ document.getElementById("clockBtn").onclick = () => {
   if (now - lastClock < 420) skipToFever(state);
   lastClock = now;
 };
+document.getElementById("cakeChip").onclick = () => {
+  if (screen !== "play") return;
+  const now = performance.now();
+  if (now - lastCake < 420) issue(state, { kind: "cheatCake", team: playerTeam(state) });
+  lastCake = now;
+};
+document.querySelectorAll("[data-side]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    pickSide = Number(btn.dataset.side);
+    document.querySelectorAll("[data-side]").forEach((b) => b.classList.toggle("on", b === btn));
+  });
+});
+document.querySelectorAll("[data-lang]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    setLang(btn.dataset.lang);
+    applyLang();
+  });
+});
+function applyLang() {
+  const L = getLang();
+  document.documentElement.lang = L === "en" ? "en" : "zh-Hant";
+  document.querySelectorAll("[data-lang]").forEach((b) => b.classList.toggle("on", b.dataset.lang === L));
+  const map = [
+    ["easy", "easy"], ["hard", "hard"], ["titleHelp", "how"], ["helpOk", "how"],
+    ["resume", "resume"], ["toTitle", "toTitle"], ["again", "again"],
+  ];
+  const easy = document.getElementById("easy"); if (easy) easy.textContent = t("easy");
+  const hard = document.getElementById("hard"); if (hard) hard.textContent = t("hard");
+  const th = document.getElementById("titleHelp"); if (th) th.textContent = t("how");
+  const ho = document.getElementById("helpOk"); if (ho) ho.textContent = L === "en" ? "Got it" : "知道了";
+  const resume = document.getElementById("resume"); if (resume) resume.textContent = t("resume");
+  const toTitle = document.getElementById("toTitle"); if (toTitle) toTitle.textContent = t("toTitle");
+  const again = document.getElementById("again"); if (again) again.textContent = t("again");
+  const kicker = document.querySelector(".kicker"); if (kicker) kicker.textContent = t("kicker");
+  const blurb = document.getElementById("titleBlurb"); if (blurb) blurb.textContent = t("blurb");
+  const fine = document.getElementById("titleFine"); if (fine) fine.textContent = t("musicHint");
+  const pausedH = document.querySelector("#paused h2"); if (pausedH) pausedH.textContent = t("paused");
+  document.querySelectorAll("[data-tab=units]").forEach((b) => { b.textContent = t("units"); });
+  document.querySelectorAll("[data-tab=build]").forEach((b) => { b.textContent = t("build"); });
+  const sh = document.querySelector("[data-act=stanceHarvest]"); if (sh) sh.textContent = t("harvest");
+  const sa = document.querySelector("[data-act=stanceAttack]"); if (sa) sa.textContent = t("attack");
+  const sd = document.querySelector("[data-act=stanceDefend]"); if (sd) sd.textContent = t("defend");
+  const st = document.querySelector("[data-act=stop]"); if (st) st.textContent = t("stop");
+  const cs = document.querySelector("[data-act=clearSel]"); if (cs) cs.textContent = t("clearSel");
+}
+applyLang();
+
 document.getElementById("muteBtn").onclick = () => {
   unlock();
   const next = !isMuted();

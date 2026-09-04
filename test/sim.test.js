@@ -35,14 +35,17 @@ function drain(state, seconds) {
 }
 
 describe("match setup", () => {
-  it("starts a 3-minute match with cake, pop, and one worker each", () => {
+  it("starts a 3-minute match with cake, two player workers, and a rider each", () => {
     const state = createState("easy");
     assert.equal(MATCH_SECS, 180);
     assert.equal(state.t, 0);
     assert.equal(state.fever, false);
-    assert.equal(state.cake[TEAM.MALTESE], 80);
-    assert.equal(teamPop(state, TEAM.MALTESE), 1);
-    assert.equal(teamPop(state, TEAM.RETRIEVER), 1);
+    assert.equal(state.cake[TEAM.MALTESE], 200);
+    assert.equal(state.gold[TEAM.MALTESE], 0);
+    assert.equal(teamPop(state, TEAM.MALTESE), 3);
+    assert.equal(teamPop(state, TEAM.RETRIEVER), 2);
+    assert.equal(state.units.filter((u) => u.team === TEAM.MALTESE && u.type === "worker").length, 2);
+    assert.equal(state.units.filter((u) => u.type === "car").length, 2);
     assert.equal(state.houses.length, 2);
     assert.ok(state.houses.every((h) => h.hp === HOUSE_HP));
     assert.equal(state.cakes.filter((c) => c.kind === "home").length, 4);
@@ -76,7 +79,7 @@ describe("economy", () => {
 
   it("idle workers auto-gather the nearest stocked cake", () => {
     const state = createState("easy");
-    const worker = state.units.find((u) => u.team === TEAM.MALTESE);
+    const worker = state.units.find((u) => u.team === TEAM.MALTESE && u.type === "worker");
     assert.equal(worker.order.type, "idle");
     assert.equal(worker.autoJob, true);
     drain(state, 0.2);
@@ -94,7 +97,7 @@ describe("production", () => {
     assert.equal(house.queue, "worker");
     assert.equal(state.cake[TEAM.MALTESE], cake0 - COSTS.worker);
     drain(state, TRAIN.worker + 0.2);
-    assert.equal(teamPop(state, TEAM.MALTESE), 2);
+    assert.equal(teamPop(state, TEAM.MALTESE), 4);
 
     while (teamPop(state, TEAM.MALTESE) < POP_CAP) {
       state.cake[TEAM.MALTESE] = 999;
@@ -254,5 +257,57 @@ describe("bugfixes #5 #6 #14 #15", () => {
     assert.equal(state.winner, TEAM.RETRIEVER);
     assert.ok(state.events.includes("lose"));
     assert.equal(state.events.includes("win"), false);
+  });
+});
+
+describe("config issues", () => {
+  it("queues a fighter while cake is short once the gym exists", () => {
+    const state = createState("easy");
+    issue(state, { kind: "build", team: TEAM.MALTESE, what: "playground", x: 1100, y: 200 });
+    drain(state, TRAIN.playground + 0.2);
+    state.cake[TEAM.MALTESE] = 10;
+    issue(state, { kind: "trainFighter", team: TEAM.MALTESE });
+    assert.equal(state.waitTrain[TEAM.MALTESE].length, 1);
+    state.cake[TEAM.MALTESE] = 200;
+    drain(state, 0.2);
+    const gym = state.buildings.find((b) => b.kind === "playground" && b.team === TEAM.MALTESE);
+    assert.equal(gym.queue, "fighter");
+    assert.equal(state.waitTrain[TEAM.MALTESE].length, 0);
+  });
+
+  it("builds a tower with gold not cake", () => {
+    const state = createState("easy");
+    const cake0 = state.cake[TEAM.MALTESE];
+    state.gold[TEAM.MALTESE] = 1;
+    issue(state, { kind: "build", team: TEAM.MALTESE, what: "tower", x: 1100, y: 200 });
+    assert.equal(state.gold[TEAM.MALTESE], 0);
+    assert.equal(state.cake[TEAM.MALTESE], cake0);
+    assert.ok(state.buildings.some((b) => b.kind === "tower" && b.team === TEAM.MALTESE));
+  });
+
+  it("fighters melee instead of spawning hearts", () => {
+    const state = createState("easy");
+    const f = state.units.find((u) => u.team === TEAM.MALTESE && u.type === "car");
+    assert.ok(f);
+    const foe = state.units.find((u) => u.team === TEAM.RETRIEVER);
+    issue(state, { kind: "attack", ids: [f.id], target: foe.id, tKind: "unit" });
+    drain(state, 0.05);
+    const fighter = {
+      ...state.units.find((u) => u.team === TEAM.MALTESE && u.type === "worker"),
+      type: "fighter",
+      x: foe.x + 20,
+      y: foe.y,
+      cd: 0,
+      order: { type: "attack", target: foe.id, tKind: "unit" },
+      hp: 40,
+      maxHp: 40,
+    };
+    fighter.id = 501;
+    state.units.push(fighter);
+    const hearts0 = state.hearts.length;
+    const hp0 = foe.hp;
+    drain(state, 0.2);
+    const after = state.units.find((u) => u.id === foe.id);
+    assert.ok(!after || after.hp < hp0 || state.hearts.length === hearts0);
   });
 });

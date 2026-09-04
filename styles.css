@@ -246,6 +246,19 @@ button:disabled { cursor: default; }
   z-index: 20;
 }
 .overlay.hidden { display: none; }
+.overlay.banner-bg {
+  background: #0b1224 url("sprites/ui/banner.png") center / cover no-repeat;
+}
+.lang-row { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
+.lang-row button {
+  height: 28px; min-width: 44px; border-radius: 999px; font-size: 12px; font-weight: 700;
+}
+.lang-row button.on, .mark.on { outline: 3px solid var(--rose); }
+.stance-row { display: flex; gap: 4px; }
+.stance-row button { flex: 1; height: 36px; font-size: 12px; padding: 0 4px; }
+button.mark {
+  border: 2px solid var(--ink); background: var(--paper); border-radius: 14px; padding: 6px 8px;
+}
 .card {
   background: var(--cream);
   color: var(--ink);

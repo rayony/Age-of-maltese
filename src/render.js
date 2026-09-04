@@ -500,7 +500,7 @@ function drawDog(ctx, u) {
   ctx.save();
   ctx.translate(0, bob);
   if (u.type === "fighter") {
-    const img = fighterFrame(u.team, u.bob, moving > 0.3);
+    const img = fighterFrame(u.team, u.bob, moving > 0.3, u.impact > 0);
     if (img) {
       drawSpr(ctx, img, 0, 20, 96, 96, u.facing < 0);
       ctx.restore();

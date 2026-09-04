@@ -28,7 +28,11 @@ import {
   HEART_R,
   NAMES,
   TEAM_NAME,
-  TEAM_NAME_ZH
+  TEAM_NAME_ZH,
+  START,
+  GOLD_COSTS,
+  GOLD_UNLOAD_CHANCE,
+  WAIT_QUEUE_CAP,
 } from "./config.js";
 let nid = 1;
 const nextId = () => nid++;
@@ -76,10 +80,20 @@ function spawnUnit(type, team, x, y) {
     aggro: null,
     hurt: 0,
     vx: 0,
-    vy: 0
+    vy: 0,
+    impact: 0,
+    idleAt: 0,
   };
 }
-function createState(difficulty = "easy", preview = false) {
+function seedUnits(team, counts, ox, oy) {
+  const out = [];
+  let i = 0;
+  for (let n = 0; n < (counts.worker || 0); n++) out.push(spawnUnit("worker", team, ox + (i++ % 2) * 36, oy + n * 28));
+  for (let n = 0; n < (counts.fighter || 0); n++) out.push(spawnUnit("fighter", team, ox + 48, oy - 40 + n * 30));
+  for (let n = 0; n < (counts.car || 0); n++) out.push(spawnUnit("car", team, ox + 20, oy + 70 + n * 28));
+  return out;
+}
+function createState(difficulty = "easy", preview = false, playerTeamId = TEAM.MALTESE) {
   nid = 1;
   const houses = [TEAM.MALTESE, TEAM.RETRIEVER].map((team) => {
     const pos = housePos(team);
@@ -107,21 +121,22 @@ function createState(difficulty = "easy", preview = false) {
     { id: nextId(), kind: "well", x: 720, y: 280, stock: WELL_STOCK, max: WELL_STOCK },
     { id: nextId(), kind: "well", x: 880, y: 620, stock: WELL_STOCK, max: WELL_STOCK }
   ];
-  const units = [
-    spawnUnit("worker", TEAM.MALTESE, 1380, 450),
-    spawnUnit("worker", TEAM.RETRIEVER, 220, 450)
-  ];
+  const player = playerTeamId === TEAM.RETRIEVER ? TEAM.RETRIEVER : TEAM.MALTESE;
+  const ai = player === TEAM.MALTESE ? TEAM.RETRIEVER : TEAM.MALTESE;
+  const units = preview
+    ? [
+        ...seedUnits(TEAM.MALTESE, { worker: 1, fighter: 1, car: 1 }, 1380, 450),
+        ...seedUnits(TEAM.RETRIEVER, { worker: 1, fighter: 1, car: 1 }, 220, 450),
+      ]
+    : [
+        ...seedUnits(player, START.player, player === TEAM.MALTESE ? 1380 : 220, 450),
+        ...seedUnits(ai, START.ai, ai === TEAM.MALTESE ? 1380 : 220, 450),
+      ];
   if (preview) {
-    units.push(
-      spawnUnit("fighter", TEAM.MALTESE, 1180, 380),
-      spawnUnit("fighter", TEAM.RETRIEVER, 420, 520),
-      spawnUnit("car", TEAM.MALTESE, 1240, 560),
-      spawnUnit("car", TEAM.RETRIEVER, 360, 360)
-    );
-    units[0].order = { type: "gather", node: cakes[0].id };
-    units[1].order = { type: "gather", node: cakes[2].id };
-    units[2].order = { type: "move", x: 900, y: 360 };
-    units[3].order = { type: "move", x: 700, y: 540 };
+    const mw = units.find((u) => u.team === TEAM.MALTESE && u.type === "worker");
+    const rw = units.find((u) => u.team === TEAM.RETRIEVER && u.type === "worker");
+    if (mw) mw.order = { type: "gather", node: cakes[0].id };
+    if (rw) rw.order = { type: "gather", node: cakes[2].id };
   }
   const buildings = preview ? [
     makeBuilding(TEAM.MALTESE, "playground", slots(TEAM.MALTESE).playground, 0),
@@ -132,7 +147,11 @@ function createState(difficulty = "easy", preview = false) {
     winner: null,
     difficulty,
     preview,
-    cake: [80, 80],
+    player,
+    cake: [START.cake, START.cake],
+    gold: [START.gold, START.gold],
+    stance: [null, null],
+    waitTrain: [[], []],
     houses,
     buildings,
     cakes,
@@ -184,12 +203,33 @@ function spend(state, team, n) {
   state.cake[team] -= n;
   return true;
 }
+function spendGold(state, team, n) {
+  if ((state.gold[team] || 0) < n) return false;
+  state.gold[team] -= n;
+  return true;
+}
+function playerTeam(state) {
+  return state.player ?? TEAM.MALTESE;
+}
+function enemyOf(state) {
+  return playerTeam(state) === TEAM.MALTESE ? TEAM.RETRIEVER : TEAM.MALTESE;
+}
+function isMelee(u) {
+  return !!STATS[u.type].melee;
+}
+function strikeDmg(state, u, tKind) {
+  const s = STATS[u.type];
+  let dmg = s.dmg * feverMul(state);
+  if (s.vsBuilding && (tKind === "building" || tKind === "house")) dmg *= s.vsBuilding;
+  if (s.vsUnit && tKind === "unit") dmg *= s.vsUnit;
+  return dmg;
+}
 function unitsByIds(state, ids) {
   if (!ids.length) return [];
   const set = new Set(ids);
   return state.units.filter((u) => set.has(u.id));
 }
-function friendlyIds(state, ids, team = TEAM.MALTESE) {
+function friendlyIds(state, ids, team = playerTeam(state)) {
   if (!ids.length) return [];
   const set = new Set(ids);
   return state.units.filter((u) => set.has(u.id) && u.team === team).map((u) => u.id);
@@ -203,7 +243,7 @@ function hasReady(state, team, kind) {
   return state.buildings.some((b) => b.team === team && b.kind === kind && b.hp > 0 && b.buildLeft <= 0);
 }
 function unfinished(state, team) {
-  return state.buildings.filter((b) => b.team === team && b.buildLeft > 0).sort((a, b) => a.order - b.order);
+  return state.buildings.filter((b) => b.team === team && (b.buildLeft > 0 || b.phase === "waiting")).sort((a, b) => a.order - b.order);
 }
 function activeBuild(state, team) {
   return unfinished(state, team).find((b) => b.phase === "building") || null;
@@ -235,14 +275,33 @@ function cutInBuild(state, team) {
 function queueAt(state, team, bKind, unitType) {
   const b = buildingOf(state, team, bKind);
   if (!b) return false;
-  if (teamPop(state, team) >= POP_CAP) return false;
-  if (b.queue) return false;
-  if (!spend(state, team, COSTS[unitType])) return false;
+  const cost = COSTS[unitType];
+  if (b.queue || state.cake[team] < cost || teamPop(state, team) >= POP_CAP) {
+    if ((state.waitTrain[team] || []).length >= WAIT_QUEUE_CAP) return false;
+    state.waitTrain[team].push({ unitType, bKind, cost });
+    return true;
+  }
+  if (!spend(state, team, cost)) return false;
   b.queue = unitType;
   b.queueT = TRAIN[unitType];
   b.queueMax = TRAIN[unitType];
   state.events.push("train");
   return true;
+}
+function flushWaitTrain(state, team) {
+  const list = state.waitTrain[team];
+  if (!list?.length) return;
+  const next = list[0];
+  if (teamPop(state, team) >= POP_CAP) return;
+  if (state.cake[team] < next.cost) return;
+  const b = buildingOf(state, team, next.bKind);
+  if (!b || b.queue) return;
+  if (!spend(state, team, next.cost)) return;
+  list.shift();
+  b.queue = next.unitType;
+  b.queueT = TRAIN[next.unitType];
+  b.queueMax = TRAIN[next.unitType];
+  state.events.push("train");
 }
 function canPlace(state, x, y) {
   if (x < 70 || x > W - 70 || y < 80 || y > H - 80) return false;
@@ -259,13 +318,36 @@ function startBuild(state, team, what, x, y) {
     y: clamp(y ?? fallback.y, 90, H - 90)
   };
   if (x != null && y != null && !canPlace(state, pos.x, pos.y)) return;
-  if (!spend(state, team, COSTS[what])) return;
+  const cakeCost = COSTS[what] || 0;
+  const goldCost = GOLD_COSTS[what] || 0;
+  const canPay = state.cake[team] >= cakeCost && (state.gold[team] || 0) >= goldCost;
+  const waitingN = unfinished(state, team).filter((b) => b.phase === "waiting").length;
+  if (!canPay && waitingN >= WAIT_QUEUE_CAP) return;
   const busy = !!activeBuild(state, team) || state.buildPaused[team];
   const b = makeBuilding(team, what, pos, TRAIN[what]);
-  b.phase = busy ? "queued" : "building";
+  if (canPay) {
+    if (cakeCost) spend(state, team, cakeCost);
+    if (goldCost) spendGold(state, team, goldCost);
+    b.phase = busy ? "queued" : "building";
+  } else {
+    b.phase = "waiting";
+    b.payCake = cakeCost;
+    b.payGold = goldCost;
+  }
   state.buildings.push(b);
   state.events.push("build");
   state.markers.push({ x: pos.x, y: pos.y, t: 0, kind: "place" });
+}
+function payWaitingBuilds(state, team) {
+  for (const b of unfinished(state, team)) {
+    if (b.phase !== "waiting") continue;
+    const cakeCost = b.payCake || 0;
+    const goldCost = b.payGold || 0;
+    if (state.cake[team] < cakeCost || (state.gold[team] || 0) < goldCost) continue;
+    if (cakeCost) spend(state, team, cakeCost);
+    if (goldCost) spendGold(state, team, goldCost);
+    b.phase = activeBuild(state, team) || state.buildPaused[team] ? "queued" : "building";
+  }
 }
 function feverMul(state) {
   return state.fever ? FEVER_ATK : 1;
@@ -278,10 +360,9 @@ function aimAt(from, t) {
 function fire(state, u, tx, ty, charge, home) {
   if (u.cd > 0) return;
   const s = STATS[u.type];
-  let dmg = s.dmg;
+  let dmg = strikeDmg(state, u, home?.kind || "unit");
   const charged = u.type === "fighter" && charge > 0.45;
-  if (charged) dmg = s.charged;
-  dmg *= feverMul(state);
+  if (charged) dmg = s.charged * feverMul(state);
   const dx = tx - u.x;
   const dy = ty - u.y;
   const len = Math.hypot(dx, dy) || 1;
@@ -327,6 +408,42 @@ function fireDefense(state, src, t, tKind, dmg, rof) {
   });
   src.atkCd = rof;
   state.events.push("shoot");
+}
+function meleeStrike(state, u, t, tKind) {
+  const dmg = strikeDmg(state, u, tKind);
+  t.hp -= dmg;
+  t.hurt = 0.45;
+  u.cd = STATS[u.type].rof;
+  u.impact = 0.22;
+  const dx = u.x - t.x, dy = u.y - t.y;
+  const len = Math.hypot(dx, dy) || 1;
+  u.x += (dx / len) * 18;
+  u.y += (dy / len) * 12;
+  if ("team" in t && t.team !== u.team) {
+    if (tKind === "house") {
+      state.houseWarn[t.team] = 1.6;
+      state.events.push("houseHit");
+    } else {
+      state.unitWarn = 1.1;
+      if ("aggro" in t) t.aggro = u.id;
+      state.events.push("hit");
+    }
+  }
+  state.puffs.push({ x: t.x, y: t.y - 10, t: 0, life: 0.2, r: 14, hue: "rose" });
+}
+function huntNext(state, u) {
+  if (u.type === "worker") {
+    u.order = { type: "idle" };
+    return;
+  }
+  const past = u.team === TEAM.MALTESE ? u.x < 840 : u.x > 760;
+  if (u.team === playerTeam(state) && !past && state.stance[u.team] !== "attack") {
+    u.order = { type: "idle" };
+    return;
+  }
+  const best = nearestEnemy(state, u, 880);
+  if (best) u.order = { type: "attack", target: best.t.id, tKind: best.kind };
+  else u.order = { type: "idle" };
 }
 function targetPos(state, order) {
   if (order.tKind === "unit") return state.units.find((u) => u.id === order.target) || null;
@@ -439,7 +556,7 @@ function tickQueue(state, b, dt) {
   sendToRally(u, b.rally);
   if (type === "worker") u.autoJob = true;
   state.units.push(u);
-  state.puffs.push({ x: u.x, y: u.y, t: 0, life: 0.4, r: 18, hue: u.team === TEAM.MALTESE ? "cream" : "gold" });
+  state.puffs.push({ x: u.x, y: u.y, t: 0, life: 0.4, r: 18, hue: u.team === playerTeam(state) ? "cream" : "gold" });
 }
 function nearestEnemy(state, from, range, unitsOnly = false) {
   let best = null;
@@ -483,6 +600,7 @@ function tickDefense(state, src, dt, range, dmg, rof) {
 function tickUnit(state, u, dt) {
   u.cd = Math.max(0, u.cd - dt);
   u.hurt = Math.max(0, u.hurt - dt);
+  u.impact = Math.max(0, (u.impact || 0) - dt);
   u.bob += dt;
   u.x = clamp(u.x, 30, W - 30);
   u.y = clamp(u.y, 40, H - 30);
@@ -526,6 +644,17 @@ function tickUnit(state, u, dt) {
             rise: 28
           });
           state.events.push("harvest");
+          if (Math.random() < GOLD_UNLOAD_CHANCE) {
+            state.gold[u.team] = (state.gold[u.team] || 0) + 1;
+            state.floaters.push({
+              x: home.x + 18,
+              y: home.y - 52,
+              text: "+1幣",
+              t: 0,
+              life: 1,
+              rise: 34
+            });
+          }
         }
         u.carry = 0;
         if (node.stock <= 0.4) assignNextCake(state, u, node.id);
@@ -549,8 +678,8 @@ function tickUnit(state, u, dt) {
   if (o.type === "attack") {
     const t = targetPos(state, o);
     if (!t || t.hp <= 0) {
-      u.order = { type: "idle" };
       u.aggro = null;
+      huntNext(state, u);
       return;
     }
     const d = dist(u, t);
@@ -562,26 +691,34 @@ function tickUnit(state, u, dt) {
     u.vx = 0;
     u.vy = 0;
     if (u.cd <= 0) {
-      const aim = aimAt(u, t);
-      fire(state, u, aim.x, aim.y, 0, { id: t.id, kind: o.tKind });
+      if (isMelee(u)) meleeStrike(state, u, t, o.tKind);
+      else {
+        const aim = aimAt(u, t);
+        fire(state, u, aim.x, aim.y, 0, { id: t.id, kind: o.tKind });
+      }
     }
     return;
   }
   if (o.type === "idle" && u.type !== "worker") {
     u.vx = 0;
     u.vy = 0;
-    const best = u.team === TEAM.MALTESE ? null : nearestEnemy(state, u, s.range, true);
+    u.idleAt = (u.idleAt || 0) + dt;
+    const past = u.team === TEAM.MALTESE ? u.x < 840 : u.x > 760;
+    const hunt = u.team !== playerTeam(state) || past || state.stance[u.team] === "attack";
+    const best = hunt ? nearestEnemy(state, u, isMelee(u) ? s.range + 40 : s.range, true) : null;
     if (best && u.cd <= 0 && !state.preview) {
       const aim = aimAt(u, best.t);
       fire(state, u, aim.x, aim.y, 0, { id: best.t.id, kind: best.kind });
     }
-  } else if (o.type === "idle" && u.type === "worker" && u.autoJob && !state.preview) {
+  } else if (o.type === "idle" && u.type === "worker" && !state.preview) {
     u.vx = 0;
     u.vy = 0;
-    assignNextCake(state, u);
+    u.idleAt = (u.idleAt || 0) + dt;
+    if (u.autoJob || u.idleAt > 10 || state.stance[u.team] === "harvest") assignNextCake(state, u);
   } else {
     u.vx = 0;
     u.vy = 0;
+    if (o.type !== "idle") u.idleAt = 0;
   }
   if (state.preview && u.order.type === "idle" && Math.random() < 8e-3) {
     u.order = {
@@ -679,6 +816,7 @@ function issue(state, cmd) {
   if (kind === "stop") {
     for (const u of unitsByIds(state, cmd.ids)) {
       u.order = { type: "idle" };
+      u.idleAt = 0;
       u.autoJob = false;
       u.piloting = false;
       u.aggro = null;
@@ -695,6 +833,7 @@ function issue(state, cmd) {
   if (kind === "move") {
     for (const u of unitsByIds(state, cmd.ids)) {
       u.order = { type: "move", x: cmd.x, y: cmd.y };
+      u.idleAt = 0;
       u.piloting = false;
       u.autoJob = false;
     }
@@ -750,6 +889,34 @@ function issue(state, cmd) {
     u.order = { type: "idle" };
     u.charge = 0;
   }
+  if (kind === "stance") applyStance(state, cmd.team, cmd.stance);
+  if (kind === "cheatCake") {
+    state.cake[cmd.team] += 100;
+    state.floaters.push({ x: 800, y: 80, text: "+100", t: 0, life: 0.9, rise: 24 });
+  }
+}
+function applyStance(state, team, stance) {
+  state.stance[team] = stance;
+  const house = state.houses.find((h) => h.team === team);
+  const enemyH = state.houses.find((h) => h.team !== team);
+  const pool = state.units.filter((u) => u.team === team);
+  if (stance === "harvest") {
+    for (const u of pool) {
+      if (u.type === "worker") assignNextCake(state, u);
+    }
+  } else if (stance === "attack" && enemyH) {
+    for (const u of pool) {
+      u.order = { type: "attack", target: enemyH.id, tKind: "house" };
+      u.autoJob = false;
+      u.idleAt = 0;
+    }
+  } else if (stance === "defend" && house) {
+    for (const u of pool) {
+      u.order = { type: "move", x: house.x + (team === TEAM.MALTESE ? -70 : 70), y: house.y + ((u.id % 3) - 1) * 36 };
+      u.autoJob = false;
+      u.idleAt = 0;
+    }
+  }
 }
 function skipToFever(state) {
   if (state.preview || state.winner) return;
@@ -775,6 +942,8 @@ function step(state, dt, clockDt = dt) {
       tickDefense(state, h, dt, HOUSE_ATK.range, HOUSE_ATK.dmg, HOUSE_ATK.rof);
     }
     for (const team of [TEAM.MALTESE, TEAM.RETRIEVER]) {
+      payWaitingBuilds(state, team);
+      flushWaitTrain(state, team);
       promoteQueue(state, team);
       const cur = activeBuild(state, team);
       if (cur && !state.buildPaused[team]) {
@@ -852,14 +1021,14 @@ function step(state, dt, clockDt = dt) {
     }
   }
   if (!state.preview) {
-    const malteseDead = state.houses.some((h) => h.team === TEAM.MALTESE && h.hp <= 0);
-    const retrieverDead = state.houses.some((h) => h.team === TEAM.RETRIEVER && h.hp <= 0);
-    if (malteseDead || retrieverDead) {
-      if (malteseDead) {
-        state.winner = TEAM.RETRIEVER;
+    const playerDead = state.houses.some((h) => h.team === playerTeam(state) && h.hp <= 0);
+    const enemyDead = state.houses.some((h) => h.team === enemyOf(state) && h.hp <= 0);
+    if (playerDead || enemyDead) {
+      if (playerDead) {
+        state.winner = enemyOf(state);
         state.events.push("lose");
       } else {
-        state.winner = TEAM.MALTESE;
+        state.winner = playerTeam(state);
         state.events.push("win");
       }
     }
@@ -932,7 +1101,7 @@ function inspectCopy(state, sel) {
     const u = state.units.find((x) => x.id === sel.id);
     if (!u) return null;
     const s = STATS[u.type];
-    const actions = u.team === TEAM.MALTESE ? [
+    const actions = u.team === playerTeam(state) ? [
       { id: "stop", label: "\u505C\u6B62", enabled: true },
       ...u.type === "worker" ? [{ id: "autoJob", label: u.autoJob ? "\u53D6\u6D88\u81EA\u52D5\u63A1" : "\u81EA\u52D5\u63A1\u96C6", enabled: true }] : [{ id: "charge", label: "\u84C4\u529B\u5C04\u64CA", enabled: true }]
     ] : [];
@@ -952,7 +1121,7 @@ function inspectCopy(state, sel) {
   if (sel.kind === "house") {
     const h = state.houses.find((x) => x.id === sel.id);
     if (!h) return null;
-    const mine = h.team === TEAM.MALTESE;
+    const mine = h.team === playerTeam(state);
     const trainP = h.queue ? 1 - h.queueT / h.queueMax : null;
     return {
       title: `${TEAM_NAME_ZH[h.team]}\u72D7\u5C4B`,
@@ -964,7 +1133,7 @@ function inspectCopy(state, sel) {
       team: h.team,
       kind: "house",
       actions: mine ? [
-        { id: "worker", label: "\u8A13\u7DF4\u5DE5\u72D7", enabled: state.cake[0] >= COSTS.worker && teamPop(state, 0) < POP_CAP && !h.queue },
+        { id: "worker", label: "\u8A13\u7DF4\u5DE5\u72D7", enabled: state.cake[playerTeam(state)] >= COSTS.worker && teamPop(state, 0) < POP_CAP && !h.queue },
         { id: "rally", label: "\u8A2D\u96C6\u7D50\u9EDE", enabled: true }
       ] : [],
       progress: trainP != null ? { label: "\u8A13\u7DF4", p: trainP } : null
@@ -973,13 +1142,13 @@ function inspectCopy(state, sel) {
   if (sel.kind === "building") {
     const b = state.buildings.find((x) => x.id === sel.id);
     if (!b) return null;
-    const mine = b.team === TEAM.MALTESE;
+    const mine = b.team === playerTeam(state);
     const building = b.buildLeft > 0;
     const trainP = !building && b.queue ? 1 - b.queueT / b.queueMax : null;
     const buildP = building ? 1 - b.buildLeft / b.buildMax : null;
     const actions = mine ? [
-      ...b.kind === "playground" && !building ? [{ id: "fighter", label: "訓練鬥士", enabled: state.cake[0] >= COSTS.fighter && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
-      ...b.kind === "workshop" && !building ? [{ id: "car", label: "訓練騎士", enabled: state.cake[0] >= COSTS.car && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
+      ...b.kind === "playground" && !building ? [{ id: "fighter", label: "訓練鬥士", enabled: state.cake[playerTeam(state)] >= COSTS.fighter && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
+      ...b.kind === "workshop" && !building ? [{ id: "car", label: "訓練騎士", enabled: state.cake[playerTeam(state)] >= COSTS.car && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
       { id: "rally", label: "\u8A2D\u96C6\u7D50\u9EDE", enabled: true }
     ] : [];
     return {
@@ -1014,7 +1183,7 @@ function inspectCopy(state, sel) {
   return null;
 }
 function coachHint(state) {
-  const team = TEAM.MALTESE;
+  const team = playerTeam(state);
   const cake = state.cake[team];
   const workers = state.units.filter((u) => u.team === team && u.type === "worker");
   const fighters = state.units.filter((u) => u.team === team && u.type === "fighter");
@@ -1024,7 +1193,7 @@ function coachHint(state) {
     return "\u9078\u5DE5\u72D7\uFF0C\u518D\u9EDE\u9910\u8ECA\u63A1\u96C6";
   }
   if (!play && cake >= COSTS.playground && state.t > 8) return "\u9EDE\u904A\u6A02\u5834\uFF0C\u518D\u9EDE\u5730\u5716\u653E\u4F4D\u7F6E";
-  if (play && fighters.length === 0 && cake >= COSTS.fighter) return "遊樂場就緒 · 訓練鬥士出擊";
+  if (play && fighters.length === 0 && cake >= COSTS.fighter) return "健身房就緒 · 訓練鬥士出擊";
   if (fighters.length >= 2 && fighters.every((f) => f.order.type === "idle") && state.t > 40) {
     return "點選鬥士，再點對方狗屋進攻";
   }
@@ -1034,7 +1203,8 @@ function coachHint(state) {
 function commandSelected(state, ids, hit, p) {
   const mine = friendlyIds(state, ids);
   if (!mine.length) return false;
-  if (hit.kind === "unit" && hit.team === TEAM.MALTESE) return false;
+  const me = playerTeam(state);
+  if (hit.kind === "unit" && hit.team === me) return false;
   if (hit.kind === "cake") {
     const workers = mine.filter((id) => state.units.find((u) => u.id === id)?.type === "worker");
     if (workers.length) {
@@ -1044,15 +1214,15 @@ function commandSelected(state, ids, hit, p) {
       return true;
     }
   }
-  if (hit.kind === "unit" && hit.team !== TEAM.MALTESE) {
+  if (hit.kind === "unit" && hit.team !== me) {
     issue(state, { kind: "attack", ids: mine, target: hit.id, tKind: "unit" });
     return true;
   }
-  if (hit.kind === "house" && hit.team !== TEAM.MALTESE) {
+  if (hit.kind === "house" && hit.team !== me) {
     issue(state, { kind: "attack", ids: mine, target: hit.id, tKind: "house" });
     return true;
   }
-  if (hit.kind === "building" && hit.team !== TEAM.MALTESE) {
+  if (hit.kind === "building" && hit.team !== me) {
     issue(state, { kind: "attack", ids: mine, target: hit.id, tKind: "building" });
     return true;
   }
@@ -1076,6 +1246,8 @@ export {
   createState,
   dist,
   friendlyIds,
+  playerTeam,
+  applyStance,
   hasReady,
   housePos,
   inspectCopy,
