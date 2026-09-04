@@ -5,6 +5,7 @@ export const MID_X = 800;
 export const POP_CAP = 10;
 export const MATCH_SECS = 180;
 export const WAIT_QUEUE_CAP = 5;
+export const ASSIST_RANGE = 220;
 export const GOLD_UNLOAD_CHANCE = 0.1;
 
 export const TEAM = { MALTESE: 0, RETRIEVER: 1 };
@@ -59,7 +60,7 @@ export const HOUSE_HP = 500;
 export const BUILDING_HP = 180;
 export const TOWER_HP = 250;
 export const FEVER_EVERY = 15;
-export const FEVER_DMG = 20;
+export const FEVER_DMG = 30;
 export const FEVER_ATK = 2;
 export const CARRY = 10;
 export const HARVEST_RATE = 2;

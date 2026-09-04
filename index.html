@@ -26,9 +26,15 @@
         </span>
         <span id="popChip" class="chip-res hidden"><b id="popNum">1/10</b></span>
         <div id="speedGroup" class="speed hidden">
-          <button data-speed="1" class="on">1x</button>
-          <button data-speed="2">2x</button>
-          <button data-speed="4">4x</button>
+          <label class="sr-only" for="speedSelect">速度</label>
+          <select id="speedSelect" aria-label="速度">
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+            <option value="8">8x</option>
+            <option value="16">16x</option>
+            <option value="32">32x</option>
+          </select>
         </div>
         <button id="muteBtn" class="icon-btn" aria-label="Mute">♪</button>
         <button id="helpBtn" class="icon-btn" aria-label="How to play">?</button>
@@ -75,7 +81,7 @@
         </aside>
         <div id="fever" class="fever hidden">
           <strong>FEVER</strong>
-          <span>攻擊 ×2 · 狗屋每 15 秒 −20</span>
+          <span>攻擊 ×2 · 狗屋每 15 秒 −30</span>
         </div>
       </div>
 
@@ -169,8 +175,8 @@
         <li>點建築鈕後再點地圖放位置。同一種可排隊，顯示數量。</li>
         <li>側欄可設集結點；新生單位會走過去。</li>
         <li>暫停整場（Paused），興建另有全停／插隊。</li>
-        <li>頂部 1x / 2x / 4x。滾輪或捏合縮放。點倒數兩下跳 Fever。</li>
-        <li>三分鐘後 Fever：攻擊 ×2，狗屋每 15 秒扣 20。1x/2x/4x 只加速單位與興建，倒數維持真實時間。</li>
+        <li>頂部速度用下拉選 1x–32x。滾輪或捏合縮放。點倒數兩下跳 Fever。</li>
+        <li>三分鐘後 Fever：攻擊 ×2，狗屋每 15 秒扣 30。速度會加速單位與興建。</li>
       </ol>
       <p class="fine">家側餐車不回補，空了會變灰且不能再採。中線蛋糕店會緩慢回補。單位近戰，塔／狗屋才射愛心（瞄準後直線飛，不追蹤）。卸貨 10% 掉 1 狗狗幣，心心塔花 1 幣。</p>
       <button id="helpOk" class="ink wide">知道了</button>

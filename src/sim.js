@@ -33,6 +33,7 @@ import {
   GOLD_COSTS,
   GOLD_UNLOAD_CHANCE,
   WAIT_QUEUE_CAP,
+  ASSIST_RANGE,
 } from "./config.js";
 let nid = 1;
 const nextId = () => nid++;
@@ -415,6 +416,8 @@ function fireDefense(state, src, t, tKind, dmg, rof, range) {
   state.events.push("shoot");
 }
 function meleeStrike(state, u, t, tKind) {
+  if ("team" in t && t.team === u.team) return;
+  if (t.hp <= 0) return;
   const dmg = strikeDmg(state, u, tKind);
   t.hp -= dmg;
   t.hurt = 0.45;
@@ -446,7 +449,7 @@ function huntNext(state, u) {
     u.order = { type: "idle" };
     return;
   }
-  const best = nearestEnemy(state, u, 880);
+  const best = nearestEnemy(state, u, ASSIST_RANGE + 40);
   if (best) u.order = { type: "attack", target: best.t.id, tKind: best.kind };
   else u.order = { type: "idle" };
 }
@@ -696,7 +699,7 @@ function tickUnit(state, u, dt) {
   }
   if (o.type === "attack") {
     const t = targetPos(state, o);
-    if (!t || t.hp <= 0) {
+    if (!t || t.hp <= 0 || t.team === u.team) {
       u.aggro = null;
       huntNext(state, u);
       return;
@@ -888,13 +891,16 @@ function issue(state, cmd) {
     return;
   }
   if (kind === "attack") {
-    for (const u of unitsByIds(state, cmd.ids)) {
+    const t = cmd.tKind === "unit" ? state.units.find((u) => u.id === cmd.target) : cmd.tKind === "house" ? state.houses.find((u) => u.id === cmd.target) : state.buildings.find((b) => b.id === cmd.target);
+    if (!t || t.hp <= 0) return;
+    const attackers = unitsByIds(state, cmd.ids).filter((u) => u.team !== t.team);
+    if (!attackers.length) return;
+    for (const u of attackers) {
       u.order = { type: "attack", target: cmd.target, tKind: cmd.tKind };
       u.piloting = false;
       u.autoJob = false;
     }
-    const t = cmd.tKind === "unit" ? state.units.find((u) => u.id === cmd.target) : cmd.tKind === "house" ? state.houses.find((u) => u.id === cmd.target) : state.buildings.find((b) => b.id === cmd.target);
-    if (t) state.markers.push({ x: t.x, y: t.y, t: 0, kind: "attack" });
+    state.markers.push({ x: t.x, y: t.y, t: 0, kind: "attack" });
     state.events.push("attack");
     return;
   }
@@ -1067,28 +1073,58 @@ function step(state, dt, clockDt = dt) {
     }
   }
 }
-function pickAt(state, x, y, team, slop = 28) {
+function pickAt(state, x, y, team, slop = 28, intent = "any") {
   const p = { x, y };
-  let best = null;
-  let bd = slop;
+  const prefer = intent === "select" ? (team ?? playerTeam(state)) : null;
+  const enemyOf = intent === "command" ? (team ?? playerTeam(state)) : null;
+  let bestU = null;
+  let bestScore = Infinity;
   for (const u of state.units) {
-    if (team != null && u.team !== team) continue;
-    const d = dist(u, p);
-    if (d < u.radius + slop * 0.45 && d < bd) {
-      bd = d;
-      best = { kind: "unit", id: u.id, team: u.team };
+    const dx = p.x - u.x;
+    const dy = p.y - (u.y - 12);
+    const d = Math.hypot(dx, dy * 0.7);
+    if (d >= u.radius + slop * 0.55) continue;
+    let score = d;
+    if (prefer != null) score += u.team === prefer ? -18 : 10;
+    if (enemyOf != null) score += u.team !== enemyOf ? -18 : 28;
+    if (score < bestScore) {
+      bestScore = score;
+      bestU = u;
     }
   }
-  if (best) return best;
+  if (bestU && !(intent === "command" && bestU.team === (team ?? playerTeam(state)))) {
+    return { kind: "unit", id: bestU.id, team: bestU.team };
+  }
+  let bestB = null;
+  let bd = Math.max(34, slop * 0.9);
   for (const n of state.cakes) {
-    if (dist(n, p) < Math.max(34, slop * 0.9)) return { kind: "cake", id: n.id };
+    const d = dist(n, p);
+    if (d < bd) {
+      bd = d;
+      bestB = { kind: "cake", id: n.id };
+    }
   }
   for (const h of state.houses) {
-    if (dist(h, p) < h.r + slop * 0.35) return { kind: "house", id: h.id, team: h.team };
+    const d = dist(h, p);
+    if (d >= h.r + slop * 0.35) continue;
+    let score = d;
+    if (enemyOf != null) score += h.team !== enemyOf ? -12 : 20;
+    if (!bestB || score < bd) {
+      bd = score;
+      bestB = { kind: "house", id: h.id, team: h.team };
+    }
   }
   for (const b of state.buildings) {
-    if (dist(b, p) < b.r + slop * 0.35) return { kind: "building", id: b.id, team: b.team };
+    const d = dist(b, p);
+    if (d >= b.r + slop * 0.35) continue;
+    let score = d;
+    if (enemyOf != null) score += b.team !== enemyOf ? -12 : 20;
+    if (!bestB || score < bd) {
+      bd = score;
+      bestB = { kind: "building", id: b.id, team: b.team };
+    }
   }
+  if (bestB) return bestB;
   return { kind: "ground", x, y };
 }
 function constructionHint(state, team) {
@@ -1244,7 +1280,7 @@ function coachHint(state) {
   if (fighters.length >= 2 && fighters.every((f) => f.order.type === "idle") && state.t > 40) {
     return "點選鬥士，再點對方狗屋進攻";
   }
-  if (state.fever) return "Fever！攻擊 ×2，兩邊狗屋每 15 秒扣 20 血";
+  if (state.fever) return "Fever！攻擊 ×2，兩邊狗屋每 15 秒扣 30 血";
   return "";
 }
 function commandSelected(state, ids, hit, p) {
