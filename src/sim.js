@@ -192,7 +192,9 @@ function makeBuilding(team, what, pos, buildLeft) {
     order: nextId(),
     rally: defaultRally(team, pos.x, pos.y),
     atkCd: 0,
-    hurt: 0
+    hurt: 0,
+    focusId: null,
+    focusKind: null
   };
 }
 function teamPop(state, team) {
@@ -389,7 +391,7 @@ function fire(state, u, tx, ty, charge, home) {
   state.events.push("shoot");
   state.puffs.push({ x: u.x, y: u.y - 8, t: 0, life: 0.22, r: 10, hue: "rose" });
 }
-function fireDefense(state, src, t, tKind, dmg, rof) {
+function fireDefense(state, src, t, tKind, dmg, rof, range) {
   const aim = aimAt(src, t);
   const dx = aim.x - src.x;
   const dy = aim.y - (src.y - 18);
@@ -403,11 +405,11 @@ function fireDefense(state, src, t, tKind, dmg, rof) {
     vy: dy / len * HEART_SPEED,
     dmg: dmg * feverMul(state),
     r: HEART_R + 1,
-    life: 2,
+    life: (range + 56) / HEART_SPEED,
     charged: false,
     ownerId: src.id,
-    homeId: t.id,
-    homeKind: tKind
+    homeId: null,
+    homeKind: null
   });
   src.atkCd = rof;
   state.events.push("shoot");
@@ -453,12 +455,6 @@ function targetPos(state, order) {
   if (order.tKind === "house") return state.houses.find((h) => h.id === order.target) || null;
   if (order.tKind === "building") return state.buildings.find((b) => b.id === order.target) || null;
   return null;
-}
-function homingPos(state, h) {
-  if (h.homeId == null || !h.homeKind) return null;
-  if (h.homeKind === "unit") return state.units.find((u) => u.id === h.homeId) || null;
-  if (h.homeKind === "house") return state.houses.find((x) => x.id === h.homeId) || null;
-  return state.buildings.find((b) => b.id === h.homeId) || null;
 }
 function moveToward(u, dest, speed, dt) {
   const dx = dest.x - u.x;
@@ -561,44 +557,64 @@ function tickQueue(state, b, dt) {
   state.units.push(u);
   state.puffs.push({ x: u.x, y: u.y, t: 0, life: 0.4, r: 18, hue: u.team === playerTeam(state) ? "cream" : "gold" });
 }
-function nearestEnemy(state, from, range, unitsOnly = false) {
+function lookupTarget(state, id, kind) {
+  if (kind === "unit") return state.units.find((u) => u.id === id) || null;
+  if (kind === "house") return state.houses.find((h) => h.id === id) || null;
+  return state.buildings.find((b) => b.id === id) || null;
+}
+function nearestOfKind(state, from, range, kind) {
   let best = null;
   let bd = range;
-  for (const e of state.units) {
+  const list = kind === "unit" ? state.units : kind === "house" ? state.houses : state.buildings;
+  for (const e of list) {
     if (e.team === from.team || e.hp <= 0) continue;
     const d = dist(from, e);
     if (d < bd) {
       bd = d;
-      best = { kind: "unit", t: e };
-    }
-  }
-  if (unitsOnly) return best;
-  for (const b of state.buildings) {
-    if (b.team === from.team || b.hp <= 0) continue;
-    const d = dist(from, b);
-    if (d < bd) {
-      bd = d;
-      best = { kind: "building", t: b };
-    }
-  }
-  for (const h of state.houses) {
-    if (h.team === from.team || h.hp <= 0) continue;
-    const d = dist(from, h);
-    if (d < bd) {
-      bd = d;
-      best = { kind: "house", t: h };
+      best = { kind, t: e };
     }
   }
   return best;
+}
+function nearestEnemy(state, from, range, filter = "any") {
+  if (filter === true || filter === "units") return nearestOfKind(state, from, range, "unit");
+  if (filter === "unitsThenBuild") {
+    return nearestOfKind(state, from, range, "unit") || nearestOfKind(state, from, range, "building") || nearestOfKind(state, from, range, "house");
+  }
+  let best = null;
+  let bd = range;
+  for (const kind of ["unit", "building", "house"]) {
+    const hit = nearestOfKind(state, from, bd, kind);
+    if (hit) {
+      const d = dist(from, hit.t);
+      if (d < bd) {
+        bd = d;
+        best = hit;
+      }
+    }
+  }
+  return best;
+}
+function towerTarget(state, src, range) {
+  if (src.focusId != null && src.focusKind) {
+    const t = lookupTarget(state, src.focusId, src.focusKind);
+    if (!t || t.hp <= 0 || t.team === src.team) {
+      src.focusId = null;
+      src.focusKind = null;
+    } else if (dist(src, t) <= range) {
+      return { kind: src.focusKind, t };
+    }
+  }
+  return nearestEnemy(state, src, range, "unitsThenBuild");
 }
 function tickDefense(state, src, dt, range, dmg, rof) {
   if ("buildLeft" in src && src.buildLeft > 0) return;
   src.atkCd = Math.max(0, src.atkCd - dt);
   src.hurt = Math.max(0, src.hurt - dt);
   if (src.atkCd > 0 || src.hp <= 0) return;
-  const hit = nearestEnemy(state, src, range);
+  const hit = src.kind === "tower" ? towerTarget(state, src, range) : nearestEnemy(state, src, range, "any");
   if (!hit) return;
-  fireDefense(state, src, hit.t, hit.kind, dmg, rof);
+  fireDefense(state, src, hit.t, hit.kind, dmg, rof, range);
 }
 function tickUnit(state, u, dt) {
   u.cd = Math.max(0, u.cd - dt);
@@ -889,6 +905,22 @@ function issue(state, cmd) {
     state.markers.push({ x: t.rally.x, y: t.rally.y, t: 0, kind: "rally" });
     return;
   }
+  if (kind === "setTowerFocus") {
+    const b = state.buildings.find((x) => x.id === cmd.id && x.team === cmd.team && x.kind === "tower");
+    if (!b || b.buildLeft > 0) return;
+    if (cmd.target == null || !cmd.tKind) {
+      b.focusId = null;
+      b.focusKind = null;
+      return;
+    }
+    const t = lookupTarget(state, cmd.target, cmd.tKind);
+    if (!t || t.hp <= 0 || t.team === cmd.team) return;
+    b.focusId = cmd.target;
+    b.focusKind = cmd.tKind;
+    state.markers.push({ x: t.x, y: t.y, t: 0, kind: "attack" });
+    state.events.push("attack");
+    return;
+  }
   if (kind === "pilotMove") {
     const u = state.units.find((x) => x.id === cmd.id);
     if (!u || u.type !== "fighter" && u.type !== "car") return;
@@ -978,19 +1010,6 @@ function step(state, dt, clockDt = dt) {
   for (const u of state.units) tickUnit(state, u, dt);
   separate(state, dt);
   for (const h of state.hearts) {
-    const home = homingPos(state, h);
-    if (home && home.hp > 0) {
-      const dx = home.x - h.x;
-      const dy = home.y - 6 - h.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const spd = Math.hypot(h.vx, h.vy) || HEART_SPEED;
-      const mix = 0.18;
-      h.vx = h.vx * (1 - mix) + dx / len * spd * mix;
-      h.vy = h.vy * (1 - mix) + dy / len * spd * mix;
-      const nlen = Math.hypot(h.vx, h.vy) || 1;
-      h.vx = h.vx / nlen * spd;
-      h.vy = h.vy / nlen * spd;
-    }
     h.x += h.vx * dt;
     h.y += h.vy * dt;
     h.life -= dt;
@@ -1163,15 +1182,29 @@ function inspectCopy(state, sel) {
     const actions = mine ? [
       ...b.kind === "playground" && !building ? [{ id: "fighter", label: "訓練鬥士", enabled: state.cake[playerTeam(state)] >= COSTS.fighter && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
       ...b.kind === "workshop" && !building ? [{ id: "car", label: "訓練騎士", enabled: state.cake[playerTeam(state)] >= COSTS.car && teamPop(state, 0) < POP_CAP && !b.queue }] : [],
+      ...b.kind === "tower" && !building ? [
+        { id: "focus", label: "指定目標", enabled: true },
+        { id: "autoFocus", label: "自動鎖定", enabled: b.focusId != null }
+      ] : [],
       { id: "rally", label: "\u8A2D\u96C6\u7D50\u9EDE", enabled: true }
     ] : [];
+    let towerStatus;
+    if (building) towerStatus = b.phase === "queued" ? "\u6392\u968A\u4E2D" : "\u5EFA\u9020\u4E2D";
+    else if (b.kind !== "tower") towerStatus = b.queue ? `\u8A13\u7DF4 ${NAMES[b.queue].zh}` : "\u5C31\u7DD2";
+    else if (b.focusId != null && b.focusKind) {
+      const t = lookupTarget(state, b.focusId, b.focusKind);
+      if (t && t.hp > 0) {
+        const label = b.focusKind === "unit" && t.type ? NAMES[t.type].zh : b.focusKind === "house" ? NAMES.house.zh : NAMES[t.kind].zh;
+        towerStatus = `鎖定 ${label}`;
+      } else towerStatus = "自動 · 最近單位";
+    } else towerStatus = "自動 · 最近單位";
     return {
       title: NAMES[b.kind].zh,
       sub: NAMES[b.kind].en,
       hp: Math.max(0, Math.ceil(b.hp)),
       maxHp: b.maxHp,
       atk: b.kind === "tower" ? String(Math.round(TOWER_ATK.dmg * feverMul(state))) : "\u2014",
-      status: building ? b.phase === "queued" ? "\u6392\u968A\u4E2D" : "\u5EFA\u9020\u4E2D" : b.queue ? `\u8A13\u7DF4 ${NAMES[b.queue].zh}` : "\u5C31\u7DD2",
+      status: towerStatus,
       team: b.team,
       kind: b.kind,
       actions,

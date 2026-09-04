@@ -1,4 +1,4 @@
-import { W, H, TEAM, TRAIN } from "./config.js";
+import { W, H, TEAM, TRAIN, TOWER_ATK } from "./config.js";
 import {
   buildingSpr,
   cakeSpr,
@@ -820,6 +820,35 @@ function draw(ctx, state, sel, inspectId, view, marquee, extras) {
     if (extras?.showRallyOf && extras.showRallyOf.x === h.rally.x) drawRally(ctx, h.rally.x, h.rally.y, h.team);
   }
   for (const b of state.buildings) drawBuilding(ctx, b);
+  if (extras?.towerRange) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(224,122,138,0.55)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.arc(extras.towerRange.x, extras.towerRange.y, extras.towerRange.r ?? TOWER_ATK.range, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(extras.towerRange.x, extras.towerRange.y, 34, 0, Math.PI * 2);
+    ctx.strokeStyle = "#e07a8a";
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    if (extras.towerLock) {
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = "#d64545";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(extras.towerRange.x, extras.towerRange.y - 18);
+      ctx.lineTo(extras.towerLock.x, extras.towerLock.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(extras.towerLock.x, extras.towerLock.y, 16, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   if (extras?.showRallyOf) drawRally(ctx, extras.showRallyOf.x, extras.showRallyOf.y, extras.showRallyOf.team);
   for (const m of state.markers) drawMarker(ctx, m);
   const units = [...state.units].sort((a, b) => a.y - b.y);
@@ -862,7 +891,9 @@ function draw(ctx, state, sel, inspectId, view, marquee, extras) {
       order: 0,
       rally: { x: extras.placing.x, y: extras.placing.y },
       atkCd: 0,
-      hurt: 0
+      hurt: 0,
+      focusId: null,
+      focusKind: null
     };
     ctx.save();
     ctx.globalAlpha = 0.7;

@@ -281,6 +281,9 @@ function hud() {
   } else if (mode?.type === "charge") {
     banner = "點目標射出蓄力愛心";
     bannerClass += " place";
+  } else if (mode?.type === "towerAim") {
+    banner = "點敵人指定塔攻擊 · 點空地恢復自動";
+    bannerClass += " place";
   } else if (state.houseWarn[0] > 0 && screen === "play") {
     banner = "狗屋被打！";
     bannerClass += " warn";
@@ -381,6 +384,12 @@ function act(kind) {
     issue(state, { kind: "autoJob", ids, on: !anyOn });
   }
   if (kind === "rally") setMode({ type: "rally" });
+  if (kind === "focus") setMode({ type: "towerAim" });
+  if (kind === "autoFocus") {
+    if (inspect?.kind === "building") {
+      issue(state, { kind: "setTowerFocus", team, id: inspect.id, target: null, tKind: null });
+    }
+  }
   if (kind === "charge") {
     const u = state.units.find((x) => ids.includes(x.id) && (x.type === "fighter" || x.type === "car"));
     if (u) {
@@ -514,6 +523,26 @@ canvas.addEventListener("pointerup", (e) => {
     setMode(null);
     marquee = null;
     return;
+  }
+  const ownTower = (() => {
+    if (!inspect || inspect.kind !== "building") return null;
+    const b = state.buildings.find((x) => x.id === inspect.id);
+    if (!b || b.team !== playerTeam(state) || b.kind !== "tower" || b.buildLeft > 0) return null;
+    return b;
+  })();
+  if (ownTower && !ids.length) {
+    if ((hit.kind === "unit" || hit.kind === "house" || hit.kind === "building") && hit.team !== playerTeam(state)) {
+      issue(state, { kind: "setTowerFocus", team: playerTeam(state), id: ownTower.id, target: hit.id, tKind: hit.kind });
+      setMode(null);
+      marquee = null;
+      return;
+    }
+    if (mode?.type === "towerAim") {
+      issue(state, { kind: "setTowerFocus", team: playerTeam(state), id: ownTower.id, target: null, tKind: null });
+      setMode(null);
+      marquee = null;
+      return;
+    }
   }
   if (h.dragUnit && h.moved) {
     issue(state, { kind: "move", ids, x: p.x, y: p.y });
@@ -728,7 +757,23 @@ function loop(now) {
   const placing = mode?.type === "place" && ghost
     ? { kind: mode.what, x: ghost.x, y: ghost.y, ok: ghost.ok }
     : null;
-  draw(ctx, state, sel, inspect?.kind === "unit" ? inspect.id : null, view, marquee, { placing, showRallyOf: rallyOf });
+  let towerRange = null;
+  let towerLock = null;
+  if (inspect?.kind === "building") {
+    const tb = state.buildings.find((x) => x.id === inspect.id);
+    if (tb && tb.kind === "tower" && tb.buildLeft <= 0) {
+      towerRange = { x: tb.x, y: tb.y };
+      if (tb.focusId != null && tb.focusKind) {
+        const t = tb.focusKind === "unit"
+          ? state.units.find((u) => u.id === tb.focusId)
+          : tb.focusKind === "house"
+            ? state.houses.find((h) => h.id === tb.focusId)
+            : state.buildings.find((x) => x.id === tb.focusId);
+        if (t) towerLock = { x: t.x, y: t.y };
+      }
+    }
+  }
+  draw(ctx, state, sel, inspect?.kind === "unit" ? inspect.id : null, view, marquee, { placing, showRallyOf: rallyOf, towerRange, towerLock });
   if (now - lastHud > 80) {
     lastHud = now;
     hud();
