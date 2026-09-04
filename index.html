@@ -41,7 +41,7 @@
         <canvas id="game" width="1600" height="900"></canvas>
         <div class="float-hud">
           <div class="side-hp left">
-            <div class="name">Retriever 小金毛</div>
+            <div class="name">小金毛</div>
             <div class="hp"><i id="toastFill"></i></div>
           </div>
           <button id="clockBtn" class="timer" title="點兩下跳到 Fever 前 3 秒">
@@ -49,7 +49,7 @@
             <em id="clockLabel">Countdown</em>
           </button>
           <div class="side-hp right">
-            <div class="name" id="mallowName">Maltese 小白</div>
+            <div class="name" id="mallowName">小白</div>
             <div class="hp"><i id="mallowFill"></i></div>
           </div>
         </div>
@@ -69,13 +69,13 @@
             <div class="stat"><span id="insProgLabel">進度</span><b id="insProgNum">0%</b></div>
             <div class="bar rose"><i id="insProgFill"></i></div>
           </div>
-          <div class="stat"><span>攻擊</span><b id="insAtk">—</b></div>
-          <div class="stat"><span>狀態</span><b id="insSt">idle</b></div>
+          <div class="stat"><span id="insAtkLabel">攻擊</span><b id="insAtk">—</b></div>
+          <div class="stat"><span id="insStLabel">狀態</span><b id="insSt">idle</b></div>
           <div id="inspectActs" class="acts"></div>
         </aside>
         <div id="fever" class="fever hidden">
           <strong>FEVER</strong>
-          <span>攻擊 ×2 · 狗屋每 15 秒 −20</span>
+          <span id="feverSub">攻擊 ×2 · 狗屋每 15 秒 −20</span>
         </div>
       </div>
 
@@ -120,14 +120,14 @@
       <div class="marks">
         <button class="mark on" data-side="0" type="button">
           <img src="sprites/maltese/worker-idle-0.png" width="64" height="64" alt="Maltese" />
-          <span>Maltese 小白</span>
+          <span>小白</span>
         </button>
         <svg class="heart-mark" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
           <path d="M14 24C14 24 4 17 4 11.5 4 8 6.8 6 9.5 6 11.4 6 13 7.2 14 9c1-1.8 2.6-3 4.5-3C21.2 6 24 8 24 11.5 24 17 14 24 14 24Z" fill="#e07a8a" stroke="#2a2218" stroke-width="2"/>
         </svg>
         <button class="mark" data-side="1" type="button">
           <img src="sprites/retriever/worker-idle-0.png" width="64" height="64" alt="Retriever" />
-          <span>Retriever 小金毛</span>
+          <span>小金毛</span>
         </button>
       </div>
       <p id="titleBlurb">原創小白小隊對小金毛小隊。採蛋糕、蓋塔、訓練鬥士。單位近戰揮擊；心心塔花 1 狗狗幣，點塔再點敵人指定目標。</p>
@@ -151,7 +151,7 @@
   <div id="paused" class="overlay hidden banner-bg">
     <div class="card">
       <h2>Paused</h2>
-      <p class="fine">整場暫停，含興建。</p>
+      <p class="fine" id="pausedFine">整場暫停，含興建。</p>
       <div class="row">
         <button id="resume" class="ink">繼續</button>
         <button id="toTitle">回標題</button>
@@ -161,8 +161,8 @@
 
   <div id="help" class="overlay hidden">
     <div class="card help-card">
-      <h2>怎麼玩</h2>
-      <ol>
+      <h2 id="helpTitle">怎麼玩</h2>
+      <ol id="helpList">
         <li>點你的白狗選取；長按拖單位是移動；拖空地是框選。</li>
         <li>選好後再點：餐車採集、敵人攻擊、空地走路。</li>
         <li>先放健身房再訓練鬥士；玩具店解鎖騎士；心心塔花 1 狗狗幣，點塔再點敵人指定攻擊。</li>
@@ -172,7 +172,7 @@
         <li>頂部 1x / 2x / 4x。滾輪或捏合縮放。點倒數兩下跳 Fever。點蛋糕兩下 +100，點狗狗幣兩下 +1 幣。</li>
         <li>三分鐘後 Fever：攻擊 ×2，狗屋每 15 秒扣 20。1x/2x/4x 只加速單位與興建，倒數維持真實時間。</li>
       </ol>
-      <p class="fine">家側餐車不回補，空了會變灰且不能再採。中線蛋糕店會緩慢回補。單位近戰，塔／狗屋才射愛心（瞄準後直線飛，不追蹤）。卸貨 10% 掉 1 狗狗幣，心心塔花 1 幣。</p>
+      <p class="fine" id="helpFine">家側餐車不回補，空了會變灰且不能再採。中線蛋糕店會緩慢回補。單位近戰，塔／狗屋才射愛心（瞄準後直線飛，不追蹤）。卸貨 10% 掉 1 狗狗幣，心心塔花 1 幣。</p>
       <button id="helpOk" class="ink wide">知道了</button>
     </div>
   </div>
