@@ -17,7 +17,7 @@ export const TEAM_NAME = {
 
 export const TEAM_NAME_ZH = {
   0: "小白",
-  1: "小金毛",
+  1: "小雞毛",
 };
 
 export const START = {
@@ -85,7 +85,7 @@ export const NAMES = {
   worker: { zh: "工狗", en: "Worker" },
   fighter: { zh: "鬥士", en: "Fighter" },
   car: { zh: "騎士", en: "Rider" },
-  playground: { zh: "健身房", en: "Gym room" },
+  playground: { zh: "Gym", en: "Gym" },
   workshop: { zh: "玩具店", en: "Toy shop" },
   tower: { zh: "心心塔", en: "Heart tower" },
   house: { zh: "狗屋", en: "House" },
