@@ -1280,8 +1280,8 @@ function coachHint(state) {
   if (idleW.length && workers.every((w) => w.order.type !== "gather") && state.t < 40) {
     return "\u9078\u5DE5\u72D7\uFF0C\u518D\u9EDE\u9910\u8ECA\u63A1\u96C6";
   }
-  if (!play && cake >= COSTS.playground && state.t > 8) return "\u9EDE\u904A\u6A02\u5834\uFF0C\u518D\u9EDE\u5730\u5716\u653E\u4F4D\u7F6E";
-  if (play && fighters.length === 0 && cake >= COSTS.fighter) return "健身房就緒 · 訓練鬥士出擊";
+  if (!play && cake >= COSTS.playground && state.t > 8) return "點 Gym，再點地圖放位置";
+  if (play && fighters.length === 0 && cake >= COSTS.fighter) return "Gym 就緒 · 訓練鬥士出擊";
   if (fighters.length >= 2 && fighters.every((f) => f.order.type === "idle") && state.t > 40) {
     return "點選鬥士，再點對方狗屋進攻";
   }

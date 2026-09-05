@@ -1,7 +1,7 @@
 const STR = {
   zh: {
     slogan: "Harvest, Build, Attack!",
-    kicker: "小白 vs 小金毛",
+    kicker: "小白 vs 小雞毛",
     how: "怎麼玩",
     easy: "vs AI 簡單",
     hard: "vs AI 困難",
@@ -23,12 +23,12 @@ const STR = {
     clearSel: "取消選取",
     winTitle: "狗屋還在！",
     loseTitle: "狗屋倒了",
-    winMsg: "小白把小金毛的屋子砸到 0。",
-    loseMsg: "小金毛先拆掉你的屋子。再練一局。",
-    winMsgR: "小金毛把小白的屋子砸到 0。",
+    winMsg: "小白把小雞毛的屋子砸到 0。",
+    loseMsg: "小雞毛先拆掉你的屋子。再練一局。",
+    winMsgR: "小雞毛把小白的屋子砸到 0。",
     loseMsgR: "小白先拆掉你的屋子。再練一局。",
     musicHint: "點一下開音樂 · 人口 10 · 三分鐘後 Fever",
-    blurb: "原創小白小隊對小金毛小隊。採蛋糕、蓋塔、訓練鬥士。小白騎獨角獸道具，小金毛騎小鴨。塔要用狗狗幣。",
+    blurb: "原創小白小隊對小雞毛小隊。採蛋糕、蓋塔、訓練鬥士。小白騎獨角獸道具，小雞毛騎小鴨。塔要用狗狗幣。",
   },
   en: {
     slogan: "Harvest, Build, Attack!",
