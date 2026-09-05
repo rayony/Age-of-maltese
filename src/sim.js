@@ -35,8 +35,9 @@ import {
   WAIT_QUEUE_CAP,
   ASSIST_RANGE,
 } from "./config.js";
-let nid = 1;
-const nextId = () => nid++;
+function takeId(alloc) {
+  return alloc.nextId++;
+}
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -59,10 +60,10 @@ function defaultRally(team, x, y) {
   const s = team === TEAM.MALTESE ? -1 : 1;
   return { x: x + s * 70, y };
 }
-function spawnUnit(type, team, x, y) {
+function spawnUnit(alloc, type, team, x, y) {
   const s = STATS[type];
   return {
-    id: nextId(),
+    id: takeId(alloc),
     type,
     team,
     x,
@@ -86,20 +87,20 @@ function spawnUnit(type, team, x, y) {
     idleAt: 0,
   };
 }
-function seedUnits(team, counts, ox, oy) {
+function seedUnits(alloc, team, counts, ox, oy) {
   const out = [];
   let i = 0;
-  for (let n = 0; n < (counts.worker || 0); n++) out.push(spawnUnit("worker", team, ox + (i++ % 2) * 36, oy + n * 28));
-  for (let n = 0; n < (counts.fighter || 0); n++) out.push(spawnUnit("fighter", team, ox + 48, oy - 40 + n * 30));
-  for (let n = 0; n < (counts.car || 0); n++) out.push(spawnUnit("car", team, ox + 20, oy + 70 + n * 28));
+  for (let n = 0; n < (counts.worker || 0); n++) out.push(spawnUnit(alloc, "worker", team, ox + (i++ % 2) * 36, oy + n * 28));
+  for (let n = 0; n < (counts.fighter || 0); n++) out.push(spawnUnit(alloc, "fighter", team, ox + 48, oy - 40 + n * 30));
+  for (let n = 0; n < (counts.car || 0); n++) out.push(spawnUnit(alloc, "car", team, ox + 20, oy + 70 + n * 28));
   return out;
 }
 function createState(difficulty = "easy", preview = false, playerTeamId = TEAM.MALTESE) {
-  nid = 1;
+  const alloc = { nextId: 1 };
   const houses = [TEAM.MALTESE, TEAM.RETRIEVER].map((team) => {
     const pos = housePos(team);
     return {
-      id: nextId(),
+      id: takeId(alloc),
       kind: "house",
       team,
       hp: HOUSE_HP,
@@ -115,23 +116,23 @@ function createState(difficulty = "easy", preview = false, playerTeamId = TEAM.M
     };
   });
   const cakes = [
-    { id: nextId(), kind: "home", x: 1280, y: 300, stock: HOME_STOCK, max: HOME_STOCK },
-    { id: nextId(), kind: "home", x: 1280, y: 600, stock: HOME_STOCK, max: HOME_STOCK },
-    { id: nextId(), kind: "home", x: 320, y: 300, stock: HOME_STOCK, max: HOME_STOCK },
-    { id: nextId(), kind: "home", x: 320, y: 600, stock: HOME_STOCK, max: HOME_STOCK },
-    { id: nextId(), kind: "well", x: 720, y: 280, stock: WELL_STOCK, max: WELL_STOCK },
-    { id: nextId(), kind: "well", x: 880, y: 620, stock: WELL_STOCK, max: WELL_STOCK }
+    { id: takeId(alloc), kind: "home", x: 1280, y: 300, stock: HOME_STOCK, max: HOME_STOCK },
+    { id: takeId(alloc), kind: "home", x: 1280, y: 600, stock: HOME_STOCK, max: HOME_STOCK },
+    { id: takeId(alloc), kind: "home", x: 320, y: 300, stock: HOME_STOCK, max: HOME_STOCK },
+    { id: takeId(alloc), kind: "home", x: 320, y: 600, stock: HOME_STOCK, max: HOME_STOCK },
+    { id: takeId(alloc), kind: "well", x: 720, y: 280, stock: WELL_STOCK, max: WELL_STOCK },
+    { id: takeId(alloc), kind: "well", x: 880, y: 620, stock: WELL_STOCK, max: WELL_STOCK }
   ];
   const player = playerTeamId === TEAM.RETRIEVER ? TEAM.RETRIEVER : TEAM.MALTESE;
   const ai = player === TEAM.MALTESE ? TEAM.RETRIEVER : TEAM.MALTESE;
   const units = preview
     ? [
-        ...seedUnits(TEAM.MALTESE, { worker: 1, fighter: 1, car: 1 }, 1380, 450),
-        ...seedUnits(TEAM.RETRIEVER, { worker: 1, fighter: 1, car: 1 }, 220, 450),
+        ...seedUnits(alloc, TEAM.MALTESE, { worker: 1, fighter: 1, car: 1 }, 1380, 450),
+        ...seedUnits(alloc, TEAM.RETRIEVER, { worker: 1, fighter: 1, car: 1 }, 220, 450),
       ]
     : [
-        ...seedUnits(player, START.player, player === TEAM.MALTESE ? 1380 : 220, 450),
-        ...seedUnits(ai, START.ai, ai === TEAM.MALTESE ? 1380 : 220, 450),
+        ...seedUnits(alloc, player, START.player, player === TEAM.MALTESE ? 1380 : 220, 450),
+        ...seedUnits(alloc, ai, START.ai, ai === TEAM.MALTESE ? 1380 : 220, 450),
       ];
   if (preview) {
     const mw = units.find((u) => u.team === TEAM.MALTESE && u.type === "worker");
@@ -140,8 +141,8 @@ function createState(difficulty = "easy", preview = false, playerTeamId = TEAM.M
     if (rw) rw.order = { type: "gather", node: cakes[2].id };
   }
   const buildings = preview ? [
-    makeBuilding(TEAM.MALTESE, "playground", slots(TEAM.MALTESE).playground, 0),
-    makeBuilding(TEAM.RETRIEVER, "tower", slots(TEAM.RETRIEVER).tower, 0)
+    makeBuilding(alloc, TEAM.MALTESE, "playground", slots(TEAM.MALTESE).playground, 0),
+    makeBuilding(alloc, TEAM.RETRIEVER, "tower", slots(TEAM.RETRIEVER).tower, 0)
   ] : [];
   return {
     t: 0,
@@ -149,6 +150,7 @@ function createState(difficulty = "easy", preview = false, playerTeamId = TEAM.M
     difficulty,
     preview,
     player,
+    nextId: alloc.nextId,
     cake: [START.cake, START.cake],
     gold: [START.gold, START.gold],
     stance: [null, null],
@@ -172,11 +174,11 @@ function createState(difficulty = "easy", preview = false, playerTeamId = TEAM.M
     unitWarn: 0
   };
 }
-function makeBuilding(team, what, pos, buildLeft) {
+function makeBuilding(alloc, team, what, pos, buildLeft) {
   const hp = what === "tower" ? TOWER_HP : BUILDING_HP;
   const r = what === "tower" ? TOWER_ATK.r : 36;
   return {
-    id: nextId(),
+    id: takeId(alloc),
     kind: what,
     team,
     x: pos.x,
@@ -190,7 +192,7 @@ function makeBuilding(team, what, pos, buildLeft) {
     queueT: 0,
     queueMax: 1,
     phase: buildLeft > 0 ? "building" : "done",
-    order: nextId(),
+    order: takeId(alloc),
     rally: defaultRally(team, pos.x, pos.y),
     atkCd: 0,
     hurt: 0,
@@ -330,7 +332,7 @@ function startBuild(state, team, what, x, y) {
   const waitingN = unfinished(state, team).filter((b) => b.phase === "waiting").length;
   if (!canPay && waitingN >= WAIT_QUEUE_CAP) return;
   const busy = !!activeBuild(state, team) || state.buildPaused[team];
-  const b = makeBuilding(team, what, pos, TRAIN[what]);
+  const b = makeBuilding(state, team, what, pos, TRAIN[what]);
   if (canPay) {
     if (cakeCost) spend(state, team, cakeCost);
     if (goldCost) spendGold(state, team, goldCost);
@@ -373,7 +375,7 @@ function fire(state, u, tx, ty, charge, home) {
   const dy = ty - u.y;
   const len = Math.hypot(dx, dy) || 1;
   state.hearts.push({
-    id: nextId(),
+    id: takeId(state),
     team: u.team,
     x: u.x,
     y: u.y - 6,
@@ -398,7 +400,7 @@ function fireDefense(state, src, t, tKind, dmg, rof, range) {
   const dy = aim.y - (src.y - 18);
   const len = Math.hypot(dx, dy) || 1;
   state.hearts.push({
-    id: nextId(),
+    id: takeId(state),
     team: src.team,
     x: src.x,
     y: src.y - 18,
@@ -554,9 +556,10 @@ function tickQueue(state, b, dt) {
   const type = b.queue;
   b.queue = null;
   const ang = (Math.random() - 0.5) * 0.8;
-  const u = spawnUnit(type, b.team, b.x + Math.cos(ang) * 55, b.y + 50);
+  const u = spawnUnit(state, type, b.team, b.x + Math.cos(ang) * 55, b.y + 50);
   sendToRally(u, b.rally);
   if (type === "worker") u.autoJob = true;
+  while (state.units.some((other) => other.id === u.id)) u.id = takeId(state);
   state.units.push(u);
   state.puffs.push({ x: u.x, y: u.y, t: 0, life: 0.4, r: 18, hue: u.team === playerTeam(state) ? "cream" : "gold" });
 }
